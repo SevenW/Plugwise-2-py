@@ -1,0 +1,9 @@
+mac, name, savelog, monitor, switch_state, schedule_state, schedule,
+000D6F0001Axxxxx,     circle+,         	no, no, on, off, 
+000D6F0001Axxxxx,     circle1,         	yes, no, on, off, Switching schedule 1
+000D6F0001Axxxxx,     circle2,         	yes, no, on, off, 
+000D6F0001Axxxxx,     solar-500, yes, yes, on, off, 
+000D6F0001Axxxxx,     circle4,         	yes, no, on, off, test-alternate
+000D6F0001Axxxxx,     circle5,         	yes, no, on, off,
+000D6F0001Axxxxx,     solar-1710, yes, yes, on, off,
+000D6F0001Axxxxx,	  nas,              yes, yes, on, off,

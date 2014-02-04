@@ -1,0 +1,6 @@
+# Local configuration files
+my_*
+
+# Folders
+/logger
+
