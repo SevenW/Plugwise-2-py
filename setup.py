@@ -24,4 +24,3 @@ setup(name='Plugwise-2-py',
     install_requires=install_reqs,
     scripts=['plugwise_util'],
 )
-

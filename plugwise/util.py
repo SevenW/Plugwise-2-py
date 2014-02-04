@@ -23,8 +23,13 @@
 
 import sys
 import serial
+#from datetime import datetime
+import datetime
 
 DEBUG_PROTOCOL = False
+LOG_LEVEL = 0
+LOG_COMMUNICATION = False
+logcommfile = None
 
 def _string_convert_py3(s):
     if type(s) == type(b''):
@@ -43,15 +48,41 @@ else:
 
 def hexstr(s):
     return ' '.join(hex(ord(x)) for x in s)
+    
+def uint_to_int(val, octals):
+    """compute the 2's compliment of int value val for negative values"""
+    bits=octals<<2
+    if( (val&(1<<(bits-1))) != 0 ):
+        val = val - (1<<bits)
+    return val
+    
+def int_to_uint(val, octals):
+    """compute the 2's compliment of int value val for negative values"""
+    bits=octals<<2
+    if val<0:
+        val = val + (1<<bits)
+    return val
 
+
+def open_logcomm(filename):
+    global logcommfile
+    logcommfile = open(filename, 'w')
+    
+def close_logcomm():
+    logcommfile.close()
+    
 def debug(msg):
     if __debug__ and DEBUG_PROTOCOL:
-        print(msg)
+        print("%s: %s" % (datetime.datetime.now().isoformat(), msg,))
+        #print(msg)
 
-def error(msg):
-    # XXX: we currently have far to many false "protocol errors"  since we don't look for ACKs etc.
-    # so just ignore these for now unless the debug is set
-    return debug(msg)
+def error(msg, level=1):
+    if level <= LOG_LEVEL:
+        print("%s: %s" % (datetime.datetime.now().isoformat(), msg,))
+
+def logcomm(msg):
+    if LOG_COMMUNICATION:
+        logcommfile.write("%s %s \n" % (datetime.datetime.now().isoformat(), msg,))
 
 class SerialComChannel(object):
     """simple wrapper around serial module"""

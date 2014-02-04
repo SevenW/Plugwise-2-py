@@ -23,6 +23,7 @@
 # which itself has integrated parts of Plugwise-on-Linux (POL):
 #   POL v0.2 - written in 2009 by Maarten Damen <http://www.maartendamen.com>
 
+#TODO: This file is not well maintained. New commands may be missing. Not fully tested.
 
 from pprint import pprint
 import optparse
