@@ -18,7 +18,7 @@
 #
 # The program is a major modification and extension to:
 #   python-plugwise - written in 2011 by Sven Petai <hadara@bsd.ee> 
-# which itself has integrated parts of Plugwise-on-Linux (POL):
+# which itself is inspired by Plugwise-on-Linux (POL):
 #   POL v0.2 - written in 2009 by Maarten Damen <http://www.maartendamen.com>
 
 import sys
