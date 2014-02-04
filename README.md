@@ -30,5 +30,15 @@ Besides the new functions for logging and control purposes, there are major impr
 
 Currently this is a quick publication of the work that I have mainly done in 2012.
 
+Setup
+-----
+```git clone https://github.com/SevenW/Plugwise-2-py.git
+cd Plugwise-2-py
+sudo python setup.py install```
 
+config:
+Edit the proper circle mac addresses in plugwise.cfg and plugwise_control.csv. Make more changes as appropriate to your needs.
+
+run:
+```nohup python PW-logger.py >>/tmp/pwout.log&```
 
