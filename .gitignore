@@ -1,7 +1,6 @@
 # Local configuration files
 my_*
 
-
 # Folders
 /logger
 /dist
@@ -11,4 +10,5 @@ my_*
 #misc
 ez_setup.py
 *.pyc
+*.log
 

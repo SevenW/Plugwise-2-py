@@ -33,9 +33,9 @@ Currently this is a quick publication of the work that I have mainly done in 201
 
 Setup
 -----
-instalation:
-```wget https://bitbucket.org/pypa/setuptools/raw/bootstrap/ez_setup.py -O - | sudo python
-```
+installation:
+```wget https://bitbucket.org/pypa/setuptools/raw/bootstrap/ez_setup.py -O - | sudo python```
+
 ```git clone https://github.com/SevenW/Plugwise-2-py.git```
 ```cd Plugwise-2-py```
 ```sudo python setup.py install```
@@ -43,7 +43,7 @@ instalation:
 config:
 
 In pw-hostconfig.json edit tmp_path, permanent_path and serial
-```{"permanent_path": "/home/pi/datalog", "tmp_path": "/tmp", "serial": "/dev/ttyUSB0"}
+```{"permanent_path": "/home/pi/datalog", "tmp_path": "/tmp", "serial": "/dev/ttyUSB0"}```
 
 Edit the proper circle mac addresses in plugwise.cfg and plugwise_control.csv. Make more changes as appropriate to your needs.
 

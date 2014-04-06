@@ -12,11 +12,11 @@
 #
 # Plugwise-2-py is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with Plugwise-2-py.  If not, see <http://www.gnu.org/licenses/>. 
+# along with Plugwise-2-py. If not, see <http://www.gnu.org/licenses/>. 
 #
 # The program is a major modification and extension to:
 #   python-plugwise - written in 2011 by Sven Petai <hadara@bsd.ee> 
@@ -34,17 +34,21 @@ import os
 
 import pprint as pp
 import csv
+import json
+
+def jsondefault(o):
+    return o.__dict__
 
 plugwise.util.DEBUG_PROTOCOL = False
 plugwise.util.LOG_COMMUNICATION = False
 plugwise.util.LOG_LEVEL = 2
 
 cfg = json.load(open("pw-hostconfig.json"))
-tmppath = cfg['tmp_path']
-perpath = cfg['permanent_path']
+tmppath = cfg['tmp_path']+'/'
+perpath = cfg['permanent_path']+'/'
 port = cfg['serial']
 rsyncing = True
-if tmppath == None or tmppath == "":
+if tmppath == None or tmppath == "/":
     tmppath = perpath
     rsyncing = False
 
@@ -121,6 +125,9 @@ class PWControl(object):
 
         i=0
         for row in dr:
+            #remove tabs which survive dialect='trimmed'
+            for key in row:
+                if isinstance(row[key],str): row[key] = row[key].strip()
             self.bymac[row.get('mac')]=i
             self.byname[row.get('name')]=i
             #exception handling timeouts done by circle object for init
@@ -130,7 +137,7 @@ class PWControl(object):
             print self.circles[-1].attr['name']
         #print self.fieldnames
         #print self.bymac
-         
+        
         #retrieve last log addresses from persistent storage
         with open(self.lastlogfname, 'r+') as f:
             for line in f:
@@ -145,10 +152,15 @@ class PWControl(object):
         self.poll_configuration()
 
     def log_status(self):
+        self.statusfile.seek(0)
+        self.statusfile.truncate(0)
         for c in self.circles:
-            self.statusfile.write(c.attr['name'] + '\n')
-            self.statusfile.write(pp.pformat(c.get_status(), depth=2))
-            self.statusfile.write("\n\n")
+            json.dump(c.get_status(), self.statusfile, default = jsondefault)
+            # self.statusfile.write(c.attr['name'] + '\n')
+            # self.statusfile.write(pp.pformat(c.get_status(), depth=2))
+            # self.statusfile.write("\n\n")
+        self.statusfile.write("\n")
+        self.statusfile.flush()
     
     def sync_time(self):
         for c in self.circles:
@@ -202,6 +214,9 @@ class PWControl(object):
         self.schedulebyname['test-10']=1
         i=len(newschedules)
         for row in dr:
+            #remove tabs which survive dialect='schedule'
+            for key in row:
+                if isinstance(row[key],str): row[key] = row[key].strip()
             self.schedulebyname[row.get('Name')]=i
             importedschedules.append(row)
             i += 1
@@ -252,6 +267,9 @@ class PWControl(object):
         i=0
         newcontrols = []
         for row in dr:
+            #remove tabs which survive dialect='trimmed'
+            for key in row:
+                if isinstance(row[key],str): row[key] = row[key].strip()
             newcontrols.append(row)
             self.controlsbymac[row['mac']]=i
             i += 1
@@ -391,7 +409,7 @@ class PWControl(object):
                 fname = perpath + logpre + mac + logpost
                 self.logfnames[mac]=fname
                 #f = open(fname, 'a')
-
+                
     def rsync_to_persistent(self):
         global tmppath
         global perpath
@@ -477,6 +495,7 @@ class PWControl(object):
         history is retried.
         """
         for mac, fname in self.logfnames.iteritems():
+            #print("[%s: log to %s]" % (mac, fname))
             try:
                 c = self.circles[self.bymac[mac]]
             except:
@@ -531,7 +550,7 @@ class PWControl(object):
                                     log[-1]=[tdt, twatt, twatt_hour]
                                 else:
                                     log.append([dt, watt, watt_hour])
-                                print [log_idx, dt.strftime("%Y-%m-%d %H:%M"), watt, watt_hour]
+                                print [mac, log_idx, dt.strftime("%Y-%m-%d %H:%M"), watt, watt_hour]
                             last_dt = dt
                     else:
                         last -= 1
@@ -729,6 +748,7 @@ class PWControl(object):
         global minute
 
         self.log_status()
+        self.log_recordings()
         
         # #SAMPLE: demonstration of connecting 'unknown' nodes
         # #First a known node gets removed and reset, and than
@@ -752,7 +772,6 @@ class PWControl(object):
             # print c.get_info()
         # except:
             # pass
-        
 
         while 1:
             #check whether user defined configuration has been changed
