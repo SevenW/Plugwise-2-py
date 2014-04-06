@@ -18,10 +18,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Plugwise-2-py.  If not, see <http://www.gnu.org/licenses/>. 
 #
-# The program is a major modification and extension to:
-#   python-plugwise - written in 2011 by Sven Petai <hadara@bsd.ee> 
-# which itself is inspired by Plugwise-on-Linux (POL):
-#   POL v0.2 - written in 2009 by Maarten Damen <http://www.maartendamen.com>
 
 from serial.serialutil import SerialException
 
@@ -34,6 +30,7 @@ import os
 
 import pprint as pp
 import csv
+import json
 
 plugwise.util.DEBUG_PROTOCOL = False
 plugwise.util.LOG_COMMUNICATION = False
@@ -44,10 +41,14 @@ tmppath = cfg['tmp_path']
 perpath = cfg['permanent_path']
 port = cfg['serial']
 rsyncing = True
+print type(tmppath)
+print cfg
 if tmppath == None or tmppath == "":
     tmppath = perpath
     rsyncing = False
-
+print(rsyncing)
+print(perpath)
+print(tmppath)
 csv.register_dialect('trimmed', skipinitialspace=True)
 csv.register_dialect('schedule', delimiter=",", quotechar="'", quoting=csv.QUOTE_MINIMAL, skipinitialspace=True)
 
@@ -56,24 +57,150 @@ day = now.day
 hour = now.hour
 minute = now.minute
 
-actpre = 'pwact-'
-actpost = '.log'
-curpre = 'pwpower'
-curpost = '.log'
-logpre = 'pw-'
-logpost = '.log'
+class DummyStick(SerialComChannel):
+    """simulates Plugwise Stick"""
 
-open_logcomm(tmppath+"pw-communication.log")
+    def __init__(self, port=0, timeout=DEFAULT_TIMEOUT):
+        #SerialComChannel.__init__(self, port=port, timeout=timeout)
+        #self.init()
+        return
 
-#prepare for cleanup of /tmp after n days.
-cleanage = 604800; # seven days in seconds
+    def init(self):
+        #"""send init message to the stick"""
+        #msg = PlugwiseStatusRequest().serialize()
+        #self.send_msg(msg)
+        #resp = self.expect_response(PlugwiseStatusResponse)
+        #debug(str(resp))
+        return
 
-if rsyncing:
-    # Could be a recovery after a power failure
-    # /tmp/pwact-* may have disappeared, while the persitent version exists
-    perfile = perpath + actpre + now.date().isoformat() + '*' + actpost
-    cmd = "rsync -aXuv " +  perfile + " " + tmppath
-    subprocess.call(cmd, shell=True)
+    def send_msg(self, cmd):
+        #log communication done in serialize function of message object. Could be too early!
+        debug("SEND %4d %s" % (len(cmd), repr(cmd)))
+        #self.write(cmd)
+        #resp = self.expect_response(PlugwiseAckResponse)
+        #success = False
+        #if resp.status.value == 0xC1:
+        #    success = True
+        #return (success, resp.command_counter)
+        return (False, 0)
+
+    def _recv_response(self, retry_timeout=5):
+        await_response = True
+        msg = ""
+        retry_timeout += 1
+        while await_response:
+            msg += self.readline()
+            # if msg == b"":
+                # logcomm("TOUT      '' - <!> Timeout on serial port" )        
+                # raise TimeoutException("Timeout while waiting for response from device")                
+            # #debug("read:"+repr(msg)+" with length "+str(len(msg)))
+            
+            # if (msg != b""):
+                # if (msg[-1] != '\n'):
+                    # logcomm("lastbyte not 0A")
+                # else:
+                    # logcomm("lastbyte is 0A")
+                # try:    
+                    # logcomm("last bytes: %04X %04X" % (ord(msg[-2]), ord(msg[-1])))
+                # except:
+                    # logcomm("last byte : %04X" % (ord(msg[-1]),))
+                    # pass
+            # logcomm("counter: %2d" % (retry_timeout,))
+            if (msg == b"") or (msg[-1] != '\n'):
+                retry_timeout -= 1
+                if retry_timeout <= 0:
+                    if (msg != b""):
+                        logcomm("TOUT %4d %s - <!> Timeout on serial port" % ( len(msg), repr(msg)))  
+                    else:
+                        logcomm("TOUT      '' - <!> Timeout on serial port" )        
+                    raise TimeoutException("Timeout while waiting for response from device")
+                else:
+                    continue
+            
+            header_start = msg.find(PlugwiseMessage.PACKET_HEADER5)
+            if header_start < 0:
+                header_start = msg.find(PlugwiseMessage.PACKET_HEADER)
+            if header_start > 0:
+                ### 2011 firmware seems to sometimes send extra \x83 byte before some of the
+                ### response messages but there might a all kinds of chatter going on so just 
+                # look for our packet header. Due to protocol errors it might be in the middle of a response
+                logcomm("DSTR %4d %s" % ( len(msg[:header_start]), repr(msg[:header_start])))
+                msg = msg[header_start:]
+                
+            if msg.find('#') >= 0:
+                logcomm("DTRC %4d %s" % ( len(msg), repr(msg)))
+                msg = ""
+            elif len(msg)<22:
+                # Ignore. It is too short to interpet as a message.
+                # It may be part of Stick debug messages.
+                logcomm("DSHR %4d %s" % ( len(msg), repr(msg)))
+                msg = ""
+            else:
+                #message can be interpreted as response
+                #perform logcomm after interpetation of response
+                #logcomm("RECV %4d %s" % ( len(msg), repr(msg)))
+                await_response = False
+        return msg
+        
+    def is_in_sequence(self, resp, seqnr):
+        if not seqnr is None and resp.command_counter != seqnr:
+            error("Out of sequence message. Expected seqnr %s, received seqnr %s" % (seqnr, resp.command_counter))
+            return False
+        else:
+            return True
+
+    def expect_response(self, response_class, src_mac=None, seqnr=None, retry_timeout=5):
+        #error("encountered protocol error:"+"DummyStick")
+        resp = response_class(seqnr)
+        return resp
+
+    def enable_joining(self, enabled):
+        req = PlugwiseEnableJoiningRequest('', enabled)
+        _, seqnr  = self.send_msg(req.serialize())
+        self.expect_response(PlugwiseAckMacResponse)
+
+    def join_node(self, newmac, permission):
+        req = PlugwiseJoinNodeRequest(newmac, permission)
+        _, seqnr  = self.send_msg(req.serialize())
+        #No response other then normal ack
+        #After this an unsollicted 0061 response from the circle may be received.
+
+    def reset(self):
+        type = 0
+        req = PlugwiseResetRequest(self.mac, type, 20)
+        _, seqnr  = self.send_msg(req.serialize())
+        resp = self.expect_response(PlugwiseAckMacResponse)
+        return resp.status.value
+
+    def status(self):
+        req = PlugwiseStatusRequest(self.mac)
+        _, seqnr  = self.send_msg(req.serialize())
+        #TODO: There is a short and a long response to 0011.
+        #The short reponse occurs when no cirlceplus is connected, and has two byte parameters.
+        #The short repsonse is likely not properly handled (exception?)
+        resp = self.expect_response(PlugwiseStatusResponse)
+        return        
+        
+    def find_circleplus(self):
+        req = PlugwiseQueryCirclePlusRequest(self.mac)
+        _, seqnr  = self.send_msg(req.serialize())
+        #Receive the circle+ response, but possibly, only an end-protocol response is seen.
+        success = False
+        circleplusmac = None
+        try:
+            resp = self.expect_response(PlugwiseQueryCirclePlusResponse)
+            success=True
+            circleplusmac = resp.new_node_mac_id.value
+        except (TimeoutException, SerialException) as reason:
+            error("Error: %s, %s" % (datetime.now().isoformat(), reason,))        
+        return success,circleplusmac
+
+    def connect_circleplus(self):
+        req = PlugwiseConnectCirclePlusRequest(self.mac)
+        _, seqnr  = self.send_msg(req.serialize())
+        resp = self.expect_response(PlugwiseConnectCirclePlusResponse)
+        return resp.existing.value, self.allowed.value        
+
 
 class PWControl(object):
     """Main program class
@@ -84,13 +211,16 @@ class PWControl(object):
         """
         global port
         global tmppath
-        global curpre
-        global curpost
-                
-        self.device = Stick(port, timeout=1)
+
+        self.statuslogfname = tmppath+'/pwstatuslog.log'
+        self.statusfile = open(self.statuslogfname, 'w')
+        
+        try:
+            self.device = Stick(port, timeout=1)
+        except:
+            self.device = DummyStick(port, timeout=1)
+            print("DummyStick")
         self.staticconfig_fn = 'plugwise.cfg'
-        #TODO: intended for status logging
-        self.devstate_fn = 'plugwise_state.csv'
         self.control_fn = 'plugwise_control.csv'
         self.schedule_fn = 'schedule.csv'
         
@@ -105,14 +235,6 @@ class PWControl(object):
         self.byname = dict()
         self.schedulebyname = dict()
         
-        self.curfname = tmppath + curpre + curpost
-        self.curfile = open(self.curfname, 'w')
-        self.statuslogfname = tmppath+'pwstatuslog.log'
-        self.statusfile = open(self.statuslogfname, 'w')
-        self.actfiles = dict()
-        self.logfnames = dict()
-        self.daylogfnames = dict()
-        self.lastlogfname = perpath+'pwlastlog.log'
 
         #read the static configuration
         f = open(self.staticconfig_fn)
@@ -130,18 +252,7 @@ class PWControl(object):
             print self.circles[-1].attr['name']
         #print self.fieldnames
         #print self.bymac
-         
-        #retrieve last log addresses from persistent storage
-        with open(self.lastlogfname, 'r+') as f:
-            for line in f:
-                mac, logaddr = line.split(',')
-                logaddr =  int(logaddr)
-                #print ("mac -%s- logaddr -%s-" % (mac, logaddr))
-                try:
-                    self.circles[self.bymac[mac]].last_log = logaddr
-                except:
-                    error("PWControl.__init__(): lastlog mac not found in circles")
-         
+                  
         self.poll_configuration()
 
     def log_status(self):
@@ -149,7 +260,7 @@ class PWControl(object):
             self.statusfile.write(c.attr['name'] + '\n')
             self.statusfile.write(pp.pformat(c.get_status(), depth=2))
             self.statusfile.write("\n\n")
-    
+
     def sync_time(self):
         for c in self.circles:
             if not c.online:
@@ -345,73 +456,7 @@ class PWControl(object):
         debug("apply_control_changes")
         for mac, idx in self.controlsbymac.iteritems():
             self.apply_control_to_circle(self.controls[idx], mac, force)
-                
-    def setup_actfiles(self):
-        global tmppath
-        global perpath
-        global actpre
-        global actpost
-        
-        #close all open act files
-        for m, f in self.actfiles.iteritems():
-            f.close()
-        #open actfiles according to (new) config
-        self.actfiles = dict()
-        now = datetime.now()
-        today = now.date().isoformat()
-        for mac, idx in self.controlsbymac.iteritems():
-            if self.controls[idx]['monitor'].lower() == 'yes':
-                fname = tmppath + actpre + today + '-' + mac + actpost
-                f = open(fname, 'a')
-                self.actfiles[mac]=f
-
-    def setup_logfiles(self):
-        global tmppath
-        global perpath
-        global logpre
-        global logpost
-        
-        #name logfiles according to (new) config
-        self.logfnames = dict()
-        self.daylogfnames = dict()
-        now = datetime.now()
-        today = now.date().isoformat()
-        for mac, idx in self.controlsbymac.iteritems():
-            if self.controls[idx]['savelog'].lower() == 'yes':
-                try:
-                    if int(self.circles[self.bymac[self.controls[idx]['mac']]].attr['loginterval']) <60:
-                        #daily logfiles - persistent iso tmp
-                        #fname = tmppath + logpre + today + '-' + mac + logpost
-                        fname = perpath + logpre + today + '-' + mac + logpost
-                        self.daylogfnames[mac]=fname
-                except:
-                    #assume contineous logging only
-                    pass
-                #contineous log files
-                fname = perpath + logpre + mac + logpost
-                self.logfnames[mac]=fname
-                #f = open(fname, 'a')
-
-    def rsync_to_persistent(self):
-        global tmppath
-        global perpath
-        global actpre
-        global actpost
-        global logpre
-        global logpost
-        
-        if rsyncing:
-            # /tmp/pwact-*
-            tmpfile = tmppath + actpre + '*' + actpost
-            cmd = "rsync -aXv " +  tmpfile + " " + perpath
-            subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        
-    def cleanup_tmp(self):
-        tmpfiles = tmppath + actpre + '*' + actpost
-        for fn in glob.iglob(tmpfiles):
-             if time.time()-os.path.getmtime(fn) > cleanage:
-                os.unlink(fn)
-        
+                        
     def poll_configuration(self):
         debug("poll_configuration()")
         if self.last_schedule_ts != os.stat(self.schedule_fn).st_mtime:
@@ -422,168 +467,12 @@ class PWControl(object):
             self.last_control_ts = os.stat(self.control_fn).st_mtime
             self.controls = self.read_control()
             self.apply_control_changes()
-            self.setup_actfiles()
-            self.setup_logfiles()            
         #failure to apply control settings to a certain circle results
         #in offline state for that circle, so it get repaired when the
         #self.test_offline() method detects it is back online
         #a failure to load a schedule data also results in online = False,
         #and recovery is done by the same functions.
-     
-    def ten_seconds(self):
-        """
-        Failure to read an actual usage is not treated as a severe error.
-        The missed values are just not logged. The circle ends up in 
-        online = False, and the self.test_offline() tries to recover
-        """
-        self.curfile.seek(0)
-        self.curfile.truncate(0)
-        for mac, f in self.actfiles.iteritems():
-            try:
-                c = self.circles[self.bymac[mac]]                
-            except:
-                error("Error in ten_seconds(): mac from controls not found in circles")
-                continue  
-            if not c.online:
-                continue
-            
-            #prepare for logging values
-            t = datetime.time(datetime.now())
-            ts = 3600*t.hour+60*t.minute+t.second
-            try:
-                _, usage, _, _ = c.get_power_usage()
-                #print("%5d, %8.2f" % (ts, usage,))
-                f.write("%5d, %8.2f\n" % (ts, usage,))
-                self.curfile.write("%s, %.2f\n" % (mac, usage))
-            except ValueError:
-                #print("%5d, " % (ts,))
-                f.write("%5d, \n" % (ts,))
-                self.curfile.write("%s, \n" % (mac,))
-            except (TimeoutException, SerialException) as reason:
-                #for contineous monitoring just retry
-                error("Error in ten_seconds(): %s" % (reason,))
-            f.flush()
-        self.curfile.flush()
-        return
-
-    # def hourly(self):
-        # return
-        
-    def log_recordings(self):
-        """
-        Failure to read recordings for a circle will prevent writing any new
-        history data to the log files. Also the counter in the counter file is not
-        updated. Consequently, at the next call (one hour later) reading the  
-        history is retried.
-        """
-        for mac, fname in self.logfnames.iteritems():
-            try:
-                c = self.circles[self.bymac[mac]]
-            except:
-                print "mac from controls not found in circles"
-                continue
-            if not c.online:
-                continue
-            
-            #figure out what already has been logged.
-            try:
-                info = c.get_info()
-            except ValueError:
-                continue
-            except (TimeoutException, SerialException) as reason:
-                error("Error in log_recordings() get_info: %s" % (reason,))
-                continue
-            last = info['last_logaddr']
-            first = c.last_log
-            #check for buffer wrap around
-            #The last log_idx is 6015. 6016 is for the range function
-            if last < first:
-                if first >= 6016:
-                    first = 0
-                else:
-                    last = 6016
-            last_dt = None
-            log = []
-            try:
-                #read one more than request to determine interval of first measurement
-                if first>0:
-                    powlist = c.get_power_usage_history(first-1)
-                    last_dt = powlist[3][0]
-                    if powlist[1][0]==powlist[2][0]:
-                       #not correct for out of sync usage and production buffer
-                       #the returned value will be production only
-                       last_dt=powlist[2][0]
-                       
-                #loop over log addresses and write to file
-                for log_idx in range(first, last):
-                    buffer = c.get_power_usage_history(log_idx, last_dt)
-                    if len(buffer) == 4 or (len(buffer) == 2 and c.production == True):
-                        for i, (dt, watt, watt_hour) in enumerate(buffer):
-                            if not dt is None:
-                                #if the timestamp is identical to the previous, add production to usage
-                                #in case of hourly production loggin, and end of daylightsaving, duplicate
-                                #timestamps can be present for two subsequent hours. Test the index
-                                #to be odd handles this.
-                                if dt == last_dt and c.production == True and i & 1:
-                                    tdt, twatt, twatt_hour = log[-1]
-                                    twatt+=watt
-                                    twatt_hour+=watt_hour
-                                    log[-1]=[tdt, twatt, twatt_hour]
-                                else:
-                                    log.append([dt, watt, watt_hour])
-                                print [log_idx, dt.strftime("%Y-%m-%d %H:%M"), watt, watt_hour]
-                            last_dt = dt
-                    else:
-                        last -= 1
-            except ValueError:
-                continue
-                #error("Error: Failed to read power usage")
-            except (TimeoutException, SerialException) as reason:
-                #TODO: Decide on retry policy
-                #do nothing means that it is retried after one hour (next call to this function).
-                error("Error in log_recordings() wile reading history buffers - %s" % (reason,))
-                continue
-            
-            #update last_log outside try block.
-            #this results in a retry at the next call to log_recordings
-            c.last_log = last
-            
-            if c.attr['loginterval'] <60:
-                dayfname = self.daylogfnames[mac]                
-                f=open(dayfname,'a')
-            else:
-                f=open(fname,'a')
-                
-            #initialisation to a value in the past.
-            #Value assumes 6016 logadresses = 6016*4 60 minutes logs = 1002.n days
-            prev_dt = datetime.now()-timedelta(days=1003)
-            for dt, watt, watt_hour in log:
-                if not dt is None:                
-                    watt = "%15.4f" % (watt,)
-                    watt_hour = "%15.4f" % (watt_hour,)
-                    ts_str = dt.strftime("%Y-%m-%d %H:%M:%S")
-                    #print("%s, %s, %s" % (ts_str, watt, watt_hour))
-                    #log in dialy file if interval < 60 minutes
-                    if c.interval <60:
-                        if prev_dt.date() != dt.date():
-                            #open new daily log file
-                            f.close()
-                            ndate = dt.date().isoformat()
-                            # pesistent iso tmp
-                            newfname= perpath + logpre + ndate + '-' + mac + logpost
-                            self.daylogfnames[mac]=newfname
-                            f=open(newfname,'a')
-                    prev_dt = dt                
-                    f.write("%s, %s, %s\n" % (ts_str, watt, watt_hour))
-            f.close()
-
-            
-        #store lastlog addresses to file
-        with open(self.lastlogfname, 'w') as f:
-            for c in self.circles:
-                f.write("%s, %d\n" % (c.mac, c.last_log))
-        return
-        
+             
     def test_offline(self):
         """
         When an unrecoverable communication failure with a circle occurs, the circle
@@ -592,22 +481,26 @@ class PWControl(object):
         control settings and switching schedule if needed.
         In case the circle was offline during intialization, a reinit is performed.
         """
+        again_online = False
         for c in self.circles:
             if not c.online:
                 try:
                     c.ping()
                     if c.online:
                         #back online. make sure switch and schedule is ok
-                        if not c.initialized:
-                            c.reinit()
-                            self.set_interval_production(c)
-                        idx=self.controlsbymac[c.mac]
-                        self.apply_control_to_circle(self.controls[idx], c.mac)
+                        again_online = True
                 except ValueError:
                     continue
                 except (TimeoutException, SerialException) as reason:
                     error("Error in test_offline(): %s" % (reason,))
                     continue
+            if again_online:
+                if not c.initialized:
+                    c.reinit()
+                    self.set_interval_production(c)
+                #self.apply_control_changes(force=True)
+                idx=self.controlsbymac[c.mac]
+                self.apply_control_to_circle(self.controls[idx], c.mac)
                                 
     def reset_all(self):
         #NOTE: Untested function, for example purposes
@@ -727,8 +620,24 @@ class PWControl(object):
         global day
         global hour
         global minute
-
+        i=self.byname['solar-1710']
+        c=self.circles[i]
+        #print(c.get_status())
+        #pp.pprint(c.get_status(), depth=2)
         self.log_status()
+        
+        #just some testing at startup
+        try:
+            c.ping()
+            print c.get_info()
+            print c.last_log
+        except:
+            pass
+        # for log_idx in range(0,7000):
+            # print c.get_power_usage_history_raw(log_idx)
+        # print c.get_power_usage_history_raw(6014)
+        # print c.get_power_usage_history_raw(6015)
+        # print c.get_power_usage_history_raw(0)
         
         # #SAMPLE: demonstration of connecting 'unknown' nodes
         # #First a known node gets removed and reset, and than
@@ -754,46 +663,27 @@ class PWControl(object):
             # pass
         
 
-        while 1:
-            #check whether user defined configuration has been changed
-            #when schedules are changed, this call can take over ten seconds!
-            self.test_offline()
-            self.poll_configuration()
-            #align with the next ten seconds.
-            time.sleep(10-datetime.now().second%10)
-            #prepare for logging values
-            prev_day = day
-            prev_hour = hour
-            prev_minute = minute
-            now = datetime.now()
-            day = now.day
-            hour = now.hour
-            minute = now.minute
-            self.ten_seconds()            
-            if hour != prev_hour:
-                #self.hourly()
-                self.log_recordings()
-                self.rsync_to_persistent()
-                if hour == 3:
-                    self.sync_time()
-                #Allow resetted or unknown nodes to join the network every hour
-                #NOTE: Not fully tested.
-                try:
-                    self.device.enable_joining(True)
-                except:
-                    error("PWControl.run(): Communication error in enable_joining")
-                self.log_status()
-            if day != prev_day:
-                self.setup_actfiles()
-                #self.daily()
-                self.cleanup_tmp()
-                
-            #test    
-            # self.log_recordings()
-            # self.rsync_to_persistent()
-            # self.setup_actfiles()
-            # self.cleanup_tmp()
+        self.test_offline()
+        self.poll_configuration()
+        try:
+            self.device.enable_joining(True)
+        except:
+            error("PWControl.run(): Communication error in enable_joining") 
             
+        if rsyncing:
+            print("rsync enabled")
+        else:
+            print("rsync disabled")
+
+        
 main=PWControl()
 main.run()
-close_logcomm()
+
+
+
+
+
+
+
+
+

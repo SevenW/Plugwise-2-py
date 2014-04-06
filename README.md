@@ -7,9 +7,10 @@ PW-logger.py is a program is a logger of recorded meterings by plugwise.
 It also serves as a controller of the switches, and it can be used to upload
 switching/standby schedules to the circles.
 
-The interface to control is a file interface. There are three configuration files:
+The interface to control is a file interface. There are four configuration files:
+- pw-hostconfig.json: some host/sserver specific settings.
 - plugwise.cfg: intended as static configuration of the plugs.
-- plugwise_control.csv: dynamic configuration
+- plugwise_control.csv: dynamic configuration.
 - schedule.csv: contains one or more week-schedules to switch the plugs on and off.
 
 Changes to the two .csv files are automatically picked up by PW-logger.py and applied.
@@ -32,11 +33,17 @@ Currently this is a quick publication of the work that I have mainly done in 201
 
 Setup
 -----
+instalation:
+```wget https://bitbucket.org/pypa/setuptools/raw/bootstrap/ez_setup.py -O - | sudo python
+```
 ```git clone https://github.com/SevenW/Plugwise-2-py.git```
 ```cd Plugwise-2-py```
 ```sudo python setup.py install```
 
 config:
+
+In pw-hostconfig.json edit tmp_path, permanent_path and serial
+```{"permanent_path": "/home/pi/datalog", "tmp_path": "/tmp", "serial": "/dev/ttyUSB0"}
 
 Edit the proper circle mac addresses in plugwise.cfg and plugwise_control.csv. Make more changes as appropriate to your needs.
 

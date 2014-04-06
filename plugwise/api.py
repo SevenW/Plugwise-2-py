@@ -290,11 +290,20 @@ class Circle(object):
             self._get_interval()
             self.online = True
             self.initialized = True
-        except (ValueError, TimeoutException, SerialException) as reason:
+        except (ValueError, TimeoutException, SerialException, AttributeError) as reason:
             self.online = False
             self.initialized = False
             error("Circle offline during initalization Error: %s" % (reason,))       
 
+    def get_status(self):
+        retd = {}
+        for key in dir(self):
+            ptr = getattr(self, key)
+            #if isinstance(ptr, int):
+            if not hasattr(ptr, '__call__') and not key[0] == '_':
+                retd[key] = ptr
+        return retd          
+            
     def _validate_mac(self, mac):
         if not re.match("^[A-F0-9]+$", mac):
             return False

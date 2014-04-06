@@ -1,6 +1,14 @@
 # Local configuration files
 my_*
 
+
 # Folders
 /logger
+/dist
+/build
+/Plugwise_2_py.egg-info
+
+#misc
+ez_setup.py
+*.pyc
 
