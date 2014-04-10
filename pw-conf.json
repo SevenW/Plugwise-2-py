@@ -1,0 +1,10 @@
+{"static": [
+{"mac": "000D6F0001000000", "category": "misc", "name": "circle+", "loginterval": "60", "always_on": "False", "production": "False", "location": "hall"},
+{"mac": "000D6F0001000001", "category": "misc", "name": "circle1", "loginterval": "60", "always_on": "False", "production": "False", "location": "hall"},
+{"mac": "000D6F0001000002", "category": "misc", "name": "circle2", "loginterval": "60", "always_on": "False", "production": "False", "location": "hall"},
+{"mac": "000D6F0001000003", "category": "PV", "name": "solar-1", "loginterval": "2", "always_on": "True", "production": "True", "location": "attic"},
+{"mac": "000D6F0001000004", "category": "misc", "name": "circle4", "loginterval": "10", "always_on": "False", "production": "False", "location": "hall"},
+{"mac": "000D6F0001000005", "category": "fridge", "name": "circle5", "loginterval": "60", "always_on": "True", "production": "False", "location": "kitchen"},
+{"mac": "000D6F0001000006", "category": "PV", "name": "solar-2", "loginterval": "2", "always_on": "True", "production": "True", "location": "attic"},
+{"mac": "000D6F0001000007", "category": "network", "name": "nas", "loginterval": "60", "always_on": "True", "production": "False", "location": "living"}
+]}

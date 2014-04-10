@@ -25,11 +25,17 @@ import sys
 import serial
 #from datetime import datetime
 import datetime
+import logging
+import logging.handlers
 
-DEBUG_PROTOCOL = False
-LOG_LEVEL = 0
 LOG_COMMUNICATION = False
-logcommfile = None
+
+#global var
+pw_logger = None
+pw_comm_logger = None
+
+
+
 
 def _string_convert_py3(s):
     if type(s) == type(b''):
@@ -63,26 +69,56 @@ def int_to_uint(val, octals):
         val = val + (1<<bits)
     return val
 
+def init_logger(logfname, appname='plugwise2py'):
+    global pw_logger
+    pw_logger = logging.getLogger(appname)
+    log_level()
+    # Add the log message handler to the logger
+    handler = logging.handlers.RotatingFileHandler(logfname, maxBytes=1000000, backupCount=5)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    pw_logger.addHandler(handler)
+    pw_logger.info("logging started")
+   
+def log_level(level=logging.DEBUG):
+    pw_logger.setLevel(level)
 
-def open_logcomm(filename):
-    global logcommfile
-    logcommfile = open(filename, 'w')
-    
-def close_logcomm():
-    logcommfile.close()
-    
 def debug(msg):
-    if __debug__ and DEBUG_PROTOCOL:
-        print("%s: %s" % (datetime.datetime.now().isoformat(), msg,))
+    #if __debug__ and DEBUG_PROTOCOL:
+        #print("%s: %s" % (datetime.datetime.now().isoformat(), msg,))
         #print(msg)
+    pw_logger.debug(msg)
 
 def error(msg, level=1):
-    if level <= LOG_LEVEL:
-        print("%s: %s" % (datetime.datetime.now().isoformat(), msg,))
+    #if level <= LOG_LEVEL:
+        #print("%s: %s" % (datetime.datetime.now().isoformat(), msg,))
+    pw_logger.error(msg)
+        
+def info(msg):
+    #print("%s: %s" % (datetime.datetime.now().isoformat(), msg,))
+    pw_logger.info(msg)
 
+def open_logcomm(filename):
+    global pw_comm_logger
+    pw_comm_logger = logging.getLogger("pwcomm")
+    # Add the log message handler to the logger
+    handler = logging.handlers.RotatingFileHandler(filename, maxBytes=1000000, backupCount=5)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(message)s')
+    handler.setFormatter(formatter)
+    pw_comm_logger.addHandler(handler)
+    pw_comm_logger.setLevel(logging.INFO) 
+    pw_comm_logger.info("logging started")
+    #global logcommfile
+    #logcommfile = open(filename, 'w')
+    
+def close_logcomm():
+    #logcommfile.close()
+    return
+    
 def logcomm(msg):
     if LOG_COMMUNICATION:
-        logcommfile.write("%s %s \n" % (datetime.datetime.now().isoformat(), msg,))
+        #logcommfile.write("%s %s \n" % (datetime.datetime.now().isoformat(), msg,))
+        pw_comm_logger.info(msg)
 
 class SerialComChannel(object):
     """simple wrapper around serial module"""

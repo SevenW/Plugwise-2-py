@@ -98,7 +98,7 @@ class StringVal(BaseType):
         try:
             self.value = int(val)
         except ValueError:
-            debug('encountered value error while attempting to construct StringVal object. val = %s' % val)
+            debug('value error while attempting to construct StringVal object. val = %s' % val)
             self.value = 0
 
 class SInt(BaseType):
@@ -171,7 +171,7 @@ class DateTime(CompositeType):
         try:
             self.value = datetime.datetime(self.year.value, self.month.value, days+1, hours, minutes)
         except ValueError:
-            debug('encountered value error while attempting to construct datetime object')
+            debug('value error while attempting to construct datetime object')
             self.value = None
 
 class Time(CompositeType):
@@ -203,7 +203,7 @@ class DateStr(CompositeType):
         try:
             self.value = datetime.date(self.year.value+PLUGWISE_EPOCH, self.month.value, self.day.value)
         except ValueError:
-            debug('encountered value error while attempting to construct DateStr object')
+            debug('value error while attempting to construct DateStr object')
             self.value = None
        
 class TimeStr(CompositeType):
