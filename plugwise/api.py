@@ -454,8 +454,8 @@ class Circle(object):
         return retl
 
     def get_pulse_counters(self):
-        """return pulse counters for 1s interval, 8s interval and for the current hour
-        as a tuple
+        """return pulse counters for 1s interval, 8s interval and for the current hour,
+        both usage and production as a tuple
         """
         msg = PlugwisePowerUsageRequest(self.mac).serialize()
         _, seqnr  = self._comchan.send_msg(msg)
@@ -577,6 +577,9 @@ class Circle(object):
         if log_buffer_index is None:
             info_resp = self.get_info()
             log_buffer_index = info_resp['last_logaddr']
+        #the cur-pos may not be complete.
+        if log_buffer_index > 0:
+            log_buffer_index -= 1
 
         log_req = PlugwisePowerBufferRequest(self.mac, log_buffer_index).serialize()
         _, seqnr  = self._comchan.send_msg(log_req)

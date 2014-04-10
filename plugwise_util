@@ -1,39 +1,26 @@
 #!/usr/bin/env python
 
-# Copyright (C) 2012,2013,2014 Seven Watt <info@sevenwatt.com>
-# <http://www.sevenwatt.com>
-#
-# This file is part of Plugwise-2-py.
-#
-# Plugwise-2-py is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# Plugwise-2-py is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with Plugwise-2-py.  If not, see <http://www.gnu.org/licenses/>. 
-#
-# The program is a major modification and extension to:
-#   python-plugwise - written in 2011 by Sven Petai <hadara@bsd.ee> 
-# which itself is inspired by Plugwise-on-Linux (POL):
-#   POL v0.2 - written in 2009 by Maarten Damen <http://www.maartendamen.com>
+# Copyright (C) 2011 Sven Petai <hadara@bsd.ee> 
+# Use of this source code is governed by the MIT license found in the LICENSE file.
 
-#TODO: This file is not well maintained. New commands may be missing. Not fully tested.
 
 from pprint import pprint
 import optparse
+import logging
 
 from serial.serialutil import SerialException
 
 from plugwise import *
 import plugwise.util
 
+plugwise.util.LOG_COMMUNICATION = False
+init_logger("plugwise_util.log")
+log_level(logging.INFO)
+
 DEFAULT_SERIAL_PORT = "/dev/ttyUSB0"
+
+#default settings for attr-field of cirle
+conf = {"mac": "000D6F0001000000", "category": "misc", "name": "circle_n", "loginterval": "60", "always_on": "False", "production": "False", "location": "misc"}
 
 parser = optparse.OptionParser()
 parser.add_option("-m", "--mac", dest="mac", help="MAC address")
@@ -60,8 +47,8 @@ parser.add_option("-i", "--info", action="store_true", dest="info",
 parser.add_option("-q", "--query", dest="query",
     help="""Query data. Possible values are: time, pulses, last_logaddr, relay_state""")
 parser.add_option("-v", "--verbose", dest="verbose",
-    help="""Verbose mode. Argument should be a number represeting verboseness. 
-    Currently all the debug is logged at the same level so it doesn't really matter which numbre you use.""")
+    help="""Verbose mode. Argument should be a number representing verboseness. 
+    Currently all the debug is logged at the same level so it doesn't really matter which number you use.""")
 
 options, args = parser.parse_args()
 
@@ -80,7 +67,7 @@ if options.verbose:
 
 def print_pulse_counters(c):
     try:
-        print("%d %d %d" % c.get_pulse_counters())
+        print("%d %d %d %d" % c.get_pulse_counters())
     except ValueError:
         print("Error: Failed to read pulse counters")
 
@@ -103,15 +90,16 @@ def handle_log(c, log_opt):
             return False
 
     print("power usage log:")
-    for dt, watt_hours in c.get_power_usage_history(log_idx):
+    for dt, watt, watt_hours in c.get_power_usage_history(log_idx):
 
         if dt is None:
-            ts_str,watt_hours = "N/A", "N/A"
+            ts_str, watt, watt_hours = "N/A", "N/A", "N/A"
         else:
-            ts_str = dt.strftime("%Y-%m-%d %H")
-            watt_hours = "%f" % (watt_hours,)
+            ts_str = dt.strftime("%Y-%m-%d %H:%M")
+            watt = "%7.2f" % (watt,)
+            watt_hours = "%7.2f" % (watt_hours,)
 
-        print("\t%s %s Wh" % (ts_str, watt_hours))
+        print("\t%s %s W %s Wh" % (ts_str, watt, watt_hours))
 
     return True
 
@@ -130,7 +118,10 @@ def set_time(c, time_opt):
 
 try:
     device = Stick(device)
-    c = Circle(options.mac, device)
+	
+    conf['mac'] = options.mac
+    c = Circle(options.mac, device, conf)
+
     
     if options.time:
         set_time(c, options.time)
@@ -149,7 +140,7 @@ try:
     while 1:
         if options.power:
             try:
-                print("power usage: %.2fW" % (c.get_power_usage(),))
+                print("power usage: 1s=%7.2f W   8s=%7.2f W   1h=%7.2f W   1h=%7.2f W(production)" % c.get_power_usage())
             except ValueError:
                 print("Error: Failed to read power usage")
 
