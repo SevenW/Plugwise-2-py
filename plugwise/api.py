@@ -577,9 +577,9 @@ class Circle(object):
         if log_buffer_index is None:
             info_resp = self.get_info()
             log_buffer_index = info_resp['last_logaddr']
-        #the cur-pos may not be complete.
-        if log_buffer_index > 0:
-            log_buffer_index -= 1
+            #the cur-pos may not be complete.
+            if log_buffer_index > 0:
+                log_buffer_index -= 1
 
         log_req = PlugwisePowerBufferRequest(self.mac, log_buffer_index).serialize()
         _, seqnr  = self._comchan.send_msg(log_req)
