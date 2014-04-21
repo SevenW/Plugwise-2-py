@@ -159,7 +159,7 @@ class Stick(SerialComChannel):
             except UnexpectedResponse as reason:
                 #response could be an error status message
                 #suppress error logging when expecting a response to ping in case circle is offline
-                if str(reason) != 'expected response code 000E, received code 0000':
+                if str(reason) != "'expected response code 000E, received code 0000'":
                     error("unexpected response [1]:"+str(reason))
                 else:
                     debug("unexpected response [1]:"+str(reason))
@@ -235,7 +235,7 @@ class Stick(SerialComChannel):
             success=True
             circleplusmac = resp.new_node_mac_id.value
         except (TimeoutException, SerialException) as reason:
-            error("Error: %s, %s" % (datetime.now().isoformat(), reason,))        
+            error("Error: %s, %s" % (datetime.datetime.now().isoformat(), str(reason),))        
         return success,circleplusmac
 
     def connect_circleplus(self):
@@ -279,7 +279,7 @@ class Circle(object):
         if self.attr['always_on'] != 'False':
             #self.relay_state = 'on'
             self.schedule_state = 'off'
-        self.last_seen = None
+        self.last_seen = calendar.timegm(datetime.datetime.utcnow().utctimetuple())
         self.last_log = 0
         
         self.power = [0, 0, 0, 0]
@@ -300,7 +300,7 @@ class Circle(object):
         except (ValueError, TimeoutException, SerialException, AttributeError) as reason:
             self.online = False
             self.initialized = False
-            error("Circle offline during initalization Error: %s" % (reason,))       
+            error("OFFLINE Circle '%s' during initialization Error: %s" % (self.attr['name'], str(reason)))       
 
     def get_status(self):
         retd = {}
@@ -360,7 +360,7 @@ class Circle(object):
                 resp = self._comchan.expect_response(response_class, self.mac, seqnr, retry_timeout)
             except (TimeoutException, SerialException) as reason:
                 if self.online:
-                    info("Circle '%s' switched offline." % (self.attr['name'],))
+                    info("OFFLINE Circle '%s'." % (self.attr['name'],))
                 self.online = False
                 raise TimeoutException("Timeout while waiting for response from circle '%s'" % (self.attr['name'],))
             
@@ -372,14 +372,16 @@ class Circle(object):
                 else:
                     error("Received an error status '%04X' from circle '%s' with correct seqnr - Retry receive ..." % (resp.status.value, self.attr['name']))
             else:
-                self.last_seen = (datetime.datetime.utcnow()-datetime.timedelta(seconds=time.timezone)).isoformat()
+                ts_now = calendar.timegm(datetime.datetime.utcnow().utctimetuple())
                 if not self.online:
-                    info("Circle '%s' switched online." % (self.attr['name'],))
-                self.online = True
+                    info("ONLINE  Circle '%s' after %d seconds." % (self.attr['name'], ts_now - self.last_seen))
+                    self.online = True
+                #self.last_seen = (datetime.datetime.utcnow()-datetime.timedelta(seconds=time.timezone)).isoformat()
+                self.last_seen = ts_now
                 return resp
         #we only end here when multiple ack or ackmac messages are generated before the real response
         if self.online:
-            info("Circle '%s' switched offline." % (self.attr['name'],))
+            info("OFFLINE Circle '%s'." % (self.attr['name'],))
         self.online = False
         #TODO: Replace timeout exception by more specific exception
         raise TimeoutException("Received multiple error messages from circle '%s'" % (self.attr['name'],))

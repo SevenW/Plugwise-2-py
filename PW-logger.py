@@ -420,8 +420,8 @@ class PWControl(object):
         now = locnow
         today = now.date().isoformat()
         yrfold = str(now.year)+'/'
-        if not os.path.exists(tmppath+yrfolder+actdir):
-            os.makedirs(tmppath+yrfolder+actdir)
+        if not os.path.exists(tmppath+yrfold+actdir):
+            os.makedirs(tmppath+yrfold+actdir)
         for mac, idx in self.controlsbymac.iteritems():
             if self.controls[idx]['monitor'].lower() == 'yes':
                 fname = tmppath + yrfold + actdir + actpre + today + '-' + mac + actpost
@@ -653,10 +653,10 @@ class PWControl(object):
                     
                     #use year folder determined by timestamps in circles
                     yrfold = str(dt.year)+'/'
-                    if not os.path.exists(perpath+yrfolder+actdir):
-                        os.makedirs(perpath+yrfolder+actdir)
-                    if not os.path.exists(perpath+yrfolder+logdir):
-                        os.makedirs(perpath+yrfolder+logdir)
+                    if not os.path.exists(perpath+yrfold+actdir):
+                        os.makedirs(perpath+yrfold+actdir)
+                    if not os.path.exists(perpath+yrfold+logdir):
+                        os.makedirs(perpath+yrfold+logdir)
                     
                     if c.interval <60:
                         #log in daily file if interval < 60 minutes
