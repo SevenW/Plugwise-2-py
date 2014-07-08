@@ -17,3 +17,4 @@ Usage example:
 """
 
 from .api import *
+from .pwmqtt import *

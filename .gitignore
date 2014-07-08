@@ -8,6 +8,7 @@ my_*
 /Plugwise_2_py.egg-info
 
 #misc
+plugwise/mosquitto.py
 ez_setup.py
 *.pyc
 *.log

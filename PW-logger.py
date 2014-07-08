@@ -34,6 +34,17 @@ import subprocess
 import glob
 import os
 import logging
+import Queue
+import threading
+
+mqtt = True
+try:
+    import mosquitto
+except:
+    try:
+        import plugwise.mosquitto
+    except:
+        mqtt = False
 
 import pprint as pp
 import json
@@ -42,7 +53,7 @@ def jsondefault(o):
     return o.__dict__
 
 #plugwise.util.DEBUG_PROTOCOL = False
-plugwise.util.LOG_COMMUNICATION = False
+plugwise.util.LOG_COMMUNICATION = True
 #plugwise.util.LOG_LEVEL = 2
 
 cfg = json.load(open("pw-hostconfig.json"))
@@ -111,6 +122,7 @@ class PWControl(object):
         self.circles = []
         self.schedules = []
         self.controls = []
+        self.controlsjson = dict()
         
         self.bymac = dict()
         self.byname = dict()
@@ -258,7 +270,7 @@ class PWControl(object):
     def apply_schedule_changes(self):
         """ in case off a failure to upload schedule,
             c.online is set to False by api, so reload handled through
-            self.test_offline() and self.apply_control_to_circle
+            self.test_offline() and self.apply_<func>_to_circle
         """
 
         debug("apply_schedule_changes")
@@ -281,10 +293,11 @@ class PWControl(object):
                             c.undefine_schedule() #clear schedule forces a retry at next call
                             error("Error during uploading schedule: %s" % (reason,))
             
-    def read_control(self):
-        debug("read_control")
+    def read_apply_controls(self):
+        debug("read_apply_controls")
         #read the user control settings
-        controls = json.load(open(self.control_fn))        
+        controls = json.load(open(self.control_fn))  
+        self.controlsjson = controls
         self.controlsbymac = dict()
         newcontrols = []        
         i=0
@@ -308,9 +321,22 @@ class PWControl(object):
             else:
                 log_level(logging.INFO)
         
-        return newcontrols
+        self.controls =  newcontrols
+        for mac, idx in self.controlsbymac.iteritems():
+            self.apply_control_to_circle(self.controls[idx], mac, force=False)
+           
+        return
         
     def apply_control_to_circle(self, control, mac, force=False):
+        """apply control settings to circle
+        in case of a communication problem, c.online is set to False by api
+        self.test_offline() will apply the control settings again by calling this function
+        """
+        self.apply_schedule_to_circle(control, mac, force)
+        self.apply_switch_to_circle(control, mac, force)
+        self.apply_schedstate_to_circle(control, mac, force)
+
+    def apply_schedule_to_circle(self, control, mac, force=False):
         """apply control settings to circle
         in case of a communication problem, c.online is set to False by api
         self.test_offline() will apply the control settings again by calling this function
@@ -319,7 +345,7 @@ class PWControl(object):
             c = self.circles[self.bymac[mac]]                
         except:
             info("mac from controls not found in circles")
-            return
+            return False
         if not c.online:
             return False
 
@@ -365,7 +391,20 @@ class PWControl(object):
                         return False
             except:
                 error("schedule name from controls not found in table of schedules")
+        return True
                                     
+    def apply_switch_to_circle(self, control, mac, force=False):
+        """apply control settings to circle
+        in case of a communication problem, c.online is set to False by api
+        self.test_offline() will apply the control settings again by calling this function
+        """
+        try:
+            c = self.circles[self.bymac[mac]]                
+        except:
+            info("mac from controls not found in circles")
+            return False
+        if not c.online:
+            return False
         #switch on/off if required
         sw_state = control['switch_state'].lower()
         if sw_state == 'on' or sw_state == 'off':
@@ -379,8 +418,24 @@ class PWControl(object):
                     return False
         else:
             error('invalid switch_state value in controls file')
+        return (sw_state == c.relay_state)
 
+    def apply_schedstate_to_circle(self, control, mac, force=False):
+        """apply control settings to circle
+        in case of a communication problem, c.online is set to False by api
+        self.test_offline() will apply the control settings again by calling this function
+        """
+        try:
+            c = self.circles[self.bymac[mac]]                
+        except:
+            info("mac from controls not found in circles")
+            return False
+        if not c.online:
+            return False
+            
         #switch schedule on/off if required
+        sw_state = control['switch_state'].lower()
+        sw = True if sw_state == 'on' else False
         sc_state = control['schedule_state'].lower()
         if sc_state == 'on' or sc_state == 'off':
             sc = True if sc_state == 'on' else False
@@ -389,19 +444,14 @@ class PWControl(object):
                 try:
                     c.schedule_onoff(sc)
                     if not sc:
-                        #make sure to put switch in proper position when switcihng off schedule
+                        #make sure to put switch in proper position when switching off schedule
                         c.switch(sw)
                 except (ValueError, TimeoutException, SerialException) as reason:
                     error("Error in apply_control_to_circle failed to switch schedule: %s" % (reason,))
                     return False
         else:
             error('invalid schedule_state value in controls file')
-        return True
-
-    def apply_control_changes(self, force=False):
-        debug("apply_control_changes")
-        for mac, idx in self.controlsbymac.iteritems():
-            self.apply_control_to_circle(self.controls[idx], mac, force)
+        return (sc_state == c.schedule_state)
             
     def setup_actfiles(self):
         global tmppath
@@ -494,8 +544,7 @@ class PWControl(object):
             self.apply_schedule_changes()
         if self.last_control_ts != os.stat(self.control_fn).st_mtime:
             self.last_control_ts = os.stat(self.control_fn).st_mtime
-            self.controls = self.read_control()
-            self.apply_control_changes()
+            self.read_apply_controls()
             self.setup_actfiles()
             #self.setup_logfiles()            
         #failure to apply control settings to a certain circle results
@@ -503,6 +552,109 @@ class PWControl(object):
         #self.test_offline() method detects it is back online
         #a failure to load a schedule data also results in online = False,
         #and recovery is done by the same functions.
+        
+    def process_mqtt_commands(self):
+        updated = False
+        while not qsub.empty():
+            rcv = qsub.get()
+            topic = rcv[0]
+            payl = rcv[1]
+            info("process_mqtt_commands: %s %s" % (topic, payl)) 
+            #topic format: plugwise2py/cmd/<cmdname>/<mac>
+            st = topic.split('/')
+            try:
+                mac = st[-1]
+                cmd = st[-2]
+                #msg format: json: {"mac":"...", "cmd":"", "val":""}
+                msg = json.loads(payl)
+                control = self.controls[self.controlsbymac[mac]]
+                val = msg['val']
+            except:
+                error("MQTT: Invalid message format in topic or JSON payload")
+                continue
+            if cmd == "switch":
+                val = val.lower()
+                if val == "on" or val == "off":
+                    control['switch_state'] = val
+                    self.apply_switch_to_circle(control, mac)
+                else:
+                    error("MQTT command has invalid value %s" % (val,))
+            elif cmd == "schedule":
+                val = val.lower()
+                if val == "on" or val == "off":
+                    control['schedule_state'] = val
+                    self.apply_schedstate_to_circle(control, mac)
+                else:
+                    error("MQTT command has invalid value %s" % (val,))
+            elif cmd == "setsched":
+                error("MQTT command not implemented")
+            elif cmd == "reqstate":
+                #refresh power readings for circle
+                try:
+                    c = self.circles[self.bymac[mac]]                
+                    c.get_power_usage()
+                    info("Just read power for status update")
+                except:
+                    info("Error in reading power for status update")
+                #return message is generic state message below
+                
+            self.publish_circle_state(mac)
+            updated = True
+        if updated:
+            self.write_control_file()
+
+    def publish_circle_state(self, mac):
+        try:
+            c = self.circles[self.bymac[mac]]                
+        except:
+            info("mac from controls not found in circles")
+            return
+        qpub.put(("circle", c.last_seen, mac, c.online, c.relay_state, c.schedule_state, c.power, c.power_ts))
+
+    def write_control_file(self):
+        #TODO: switch to real file once tested
+        fjson = open("pw-control-test.json", 'w')
+        self.controlsjson['dynamic'] = self.controls
+        json.dump(self.controlsjson, fjson)
+        fjson.close()
+        #TODO: use correct file
+        self.last_control_ts = os.stat(self.control_fn).st_mtime
+        
+        # i=0
+        # for row in self.controlsjson['dynamic']:
+            # idx = self.controlsbymac[row['mac']]
+            # ctl = self.controls[idx]
+            # #update fields in json-dict
+            # row['switch_state'] = ctl['']
+            # row['name'] = ctl['']
+            # row['schedule_state'] = ctl['']
+            # row['schedule'] = ctl['']
+            # row['savelog'] = ctl['']
+            # row['monitor'] = ctl['']
+            # {"mac": "000D6F0001A59F7D", "switch_state": "on", "name": "circle+", "schedule_state": "off", "schedule": "", "savelog": "no", "monitor": "no"},
+            
+        # row=dict()
+        # row['']
+        
+        
+        # newcontrols = []
+        # for row in dr:
+            # #remove tabs which survive dialect='trimmed'
+            # for key in row:
+                # if isinstance(row[key],str): row[key] = row[key].strip()
+            # newcontrols.append(row)
+            # self.controlsbymac[row['mac']]=i
+            # i += 1
+            
+            # #generate JSON config to use as input in next update
+            # if i>1:
+                # fjson.write(",\n")
+            # json.dump(row, fjson)
+        # fjson.write(']}\n')
+        # fjson.close()
+        
+        # f.close()
+
      
     def ten_seconds(self):
         """
@@ -532,6 +684,8 @@ class PWControl(object):
                 #print("%10d, %8.2f" % (ts, usage,))
                 f.write("%5d, %8.2f\n" % (ts, usage,))
                 self.curfile.write("%s, %.2f\n" % (mac, usage))
+                #debug("MQTT put value in qpub")
+                qpub.put(("power", ts, mac, usage))
             except ValueError:
                 #print("%5d, " % (ts,))
                 f.write("%5d, \n" % (ts,))
@@ -540,6 +694,8 @@ class PWControl(object):
                 #for contineous monitoring just retry
                 error("Error in ten_seconds(): %s" % (reason,))
             f.flush()
+            #prevent backlog in command queue
+            if mqtt: self.process_mqtt_commands()
         self.curfile.flush()
         return
 
@@ -680,6 +836,8 @@ class PWControl(object):
                     fileopen = True
                     prev_dt = dt                
                     f.write("%s, %s, %s\n" % (ts_str, watt, watt_hour))
+                    #debug("MQTT put value in qpub")
+                    qpub.put(("energy", ts_str, mac, watt.strip(), watt_hour.strip()))
             if not f == None:
                 f.close()
                 
@@ -838,6 +996,8 @@ class PWControl(object):
         
         
     def run(self):
+        global mqtt
+        
         locnow = datetime.utcnow()-timedelta(seconds=time.timezone)
         now = locnow
         day = now.day
@@ -878,8 +1038,14 @@ class PWControl(object):
             #when schedules are changed, this call can take over ten seconds!
             self.test_offline()
             self.poll_configuration()
-            #align with the next ten seconds.
-            time.sleep(10-datetime.now().second%10)
+            ##align with the next ten seconds.
+            #time.sleep(10-datetime.now().second%10)
+            #align to next 10 second boundary, while checking for input commands.
+            ref = datetime.now()
+            proceed_at = ref + timedelta(seconds=(10 - ref.second%10), microseconds= -ref.microsecond)
+            while datetime.now() < proceed_at:
+                if mqtt: self.process_mqtt_commands()
+                time.sleep(0.5)
             #prepare for logging values
             prev_dst = dst
             prev_day = day
@@ -948,7 +1114,26 @@ class PWControl(object):
             # self.cleanup_tmp()
 
 init_logger(logpath+"pw-logger.log", "pw-logger")
-log_level(logging.INFO)
-main=PWControl()
-main.run()
-close_logcomm()
+log_level(logging.DEBUG)
+try:
+    qpub = Queue.Queue()
+    qsub = Queue.Queue()
+    mqtt_t = None
+    if  not mqtt:
+        error("No MQTT python binding installed (mosquitto-python)")
+    elif cfg.has_key('mqtt_ip') and cfg.has_key('mqtt_port'):
+        #connect to server and start worker thread.
+        mqttclient = Mqtt_client(cfg['mqtt_ip'], cfg['mqtt_port'], qpub, qsub)
+        mqtt_t = threading.Thread(target=mqttclient.run)
+        mqtt_t.setDaemon(True)
+        mqtt_t.start()
+        info("MQTT thread started")
+    else:
+        error("No MQTT broker and port configured")
+        mqtt = False
+
+    main=PWControl()
+    main.run()
+except:
+    close_logcomm()
+    raise
