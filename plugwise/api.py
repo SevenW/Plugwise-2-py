@@ -252,11 +252,13 @@ class Circle(object):
         """
         will raise ValueError if mac doesn't look valid
         """
-        mac = mac.upper()
+        mac = str(mac).upper()
         if self._validate_mac(mac) == False:
             raise ValueError("MAC address is in unexpected format: "+str(mac))
 
         self.mac = sc(mac)
+        debug("self.mac %s" % (type(self.mac),))
+        debug("mac %s" % (type(mac),))
 
         self._comchan = comchan
         
