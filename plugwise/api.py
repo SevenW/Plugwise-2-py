@@ -257,8 +257,8 @@ class Circle(object):
             raise ValueError("MAC address is in unexpected format: "+str(mac))
 
         self.mac = sc(mac)
-        debug("self.mac %s" % (type(self.mac),))
-        debug("mac %s" % (type(mac),))
+        #debug("self.mac %s" % (type(self.mac),))
+        #debug("mac %s" % (type(mac),))
 
         self._comchan = comchan
         
@@ -307,21 +307,32 @@ class Circle(object):
     def get_status(self):
         retd = {}
         retd["mac"] = self.mac
+        retd["type"] = self.type()
         retd["name"] = self.attr["name"]
+        retd["location"] = self.attr["location"]
         retd["online"] = self.online
         retd["lastseen"] = self.last_seen
         retd["readonly"] = (self.attr['always_on'] != 'False')
-        #retd["production"] = self.production
         retd["switch"] = self.relay_state
         retd["schedule"] = self.schedule_state
+        if self.schedule != None:
+            retd["schedname"] = self.schedule.name
+        else:
+            retd["schedname"] = ""
         now = calendar.timegm(datetime.datetime.utcnow().utctimetuple())
         tdelta = now - self.power_ts
-        if tdelta < 60:
-            retd["power"] = self.power[1] # 8-seconds value
-        elif tdelta < 10800:
-            retd["power"] = self.power[2] - self.power[3] # 1 hour value value
-        else:
-            retd["power"] = 0 # clear value
+        # if tdelta < 60:
+            # retd["power"] = self.power[1] # 8-seconds value
+        # elif tdelta < 10800:
+            # retd["power"] = self.power[2] - self.power[3] # 1 hour value value
+        # else:
+            # retd["power"] = 0 # clear value
+        retd["power1s"] = round(self.power[0], 3)
+        retd["power8s"] = round(self.power[1], 3)
+        retd["power1h"] = round(self.power[2] - self.power[3], 3)
+        retd["powerts"] = self.power_ts
+        retd["production"] = self.production
+        retd["interval"] = self.interval
         return retd          
            
     def dump_status(self):

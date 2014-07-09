@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-#import sys
-#import os
 import mosquitto
 from .util import *
 import Queue
@@ -59,15 +57,8 @@ class Mqtt_client(object):
                 #process data to be published
                 while not self.qpub.empty():
                     data = self.qpub.get()
-                    topic = str("plugwise2py/state/" + data[0] +"/" + data[2])
-                    if data[0] == "power":
-                        msg = str('{"typ":"pwpower","ts":%d,"mac":"%s","power":%.2f}' % (data[1],data[2],data[3]))
-                    elif data[0] == "energy":
-                        msg = str('{"typ":"pwenergy","ts":%s,"mac":"%s","power":%s,"energy":%s}' % (data[1],data[2],data[3],data[4]))
-                    elif data[0] == "circle":
-                        #("circle", c.last_seen, mac, c.online, c.relay_state, c.schedule_state, c.power[], c.power_ts)
-                        msg = str('{"typ":"circle","ts":%d,"mac":"%s","online":"%s","switch":"%s","schedule":"%s","power":%.2f,"powts":%d}' %
-                            (data[1],data[2],'yes' if data[3] else 'no',data[4],data[5],data[6][1],data[7]))
+                    topic = str("plugwise2py/state/" + data[0] +"/" + data[1])
+                    msg = str(data[2])
                     try:
                         self.mqttc.publish(topic, msg)
                     except Exception as reason:

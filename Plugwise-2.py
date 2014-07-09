@@ -48,6 +48,11 @@ except:
 
 import pprint as pp
 import json
+#from json import encoder
+
+#encoder.FLOAT_REPR = lambda o: format(o, '.2f')
+json.encoder.FLOAT_REPR = lambda f: ("%.2f" % f)
+
 
 def jsondefault(o):
     return o.__dict__
@@ -166,6 +171,21 @@ class PWControl(object):
          
         self.poll_configuration()
 
+    def get_status_json(self, mac):
+        try:
+            c = self.circles[self.bymac[mac]]
+            control = self.controls[self.controlsbymac[mac]]
+        except:
+            info("get_status_json: mac not found in circles or controls")
+            return ""
+        status = c.get_status()
+        status["monitor"] = (control['monitor'].lower() == 'yes')
+        status["savelog"] = (control['savelog'].lower() == 'yes')
+        #json.encoder.FLOAT_REPR = lambda f: ("%.2f" % f)
+        #msg = json.dumps(status, default = jsondefault)
+        msg = json.dumps(status)
+        return str(msg)
+        
     def log_status(self):
         self.statusfile.seek(0)
         self.statusfile.truncate(0)
@@ -176,7 +196,10 @@ class PWControl(object):
                 self.statusfile.write(",\n")
             else:
                 comma = True
-            json.dump(c.get_status(), self.statusfile, default = jsondefault)
+            #json.dump(c.get_status(), self.statusfile, default = jsondefault)
+            self.statusfile.write(self.get_status_json(c.mac))
+            #str('{"typ":"circle","ts":%d,"mac":"%s","online":"%s","switch":"%s","schedule":"%s","power":%.2f,
+            #"avgpower1h":%.2f,"powts":%d,"seents":%d,"interval":%d,"production":%s,"monitor":%s,"savelog":%s}'
         self.statusfile.write('\n] }\n')
         self.statusfile.flush()
         
@@ -604,12 +627,13 @@ class PWControl(object):
             self.write_control_file()
 
     def publish_circle_state(self, mac):
-        try:
-            c = self.circles[self.bymac[mac]]                
-        except:
-            info("mac from controls not found in circles")
-            return
-        qpub.put(("circle", c.last_seen, mac, c.online, c.relay_state, c.schedule_state, c.power, c.power_ts))
+        # try:
+            # c = self.circles[self.bymac[mac]]
+            # control = self.controls[self.controlsbymac[mac]]
+        # except:
+            # info("mac from controls not found in circles")
+            # return
+        qpub.put(("circle", mac, self.get_status_json(mac)))
 
     def write_control_file(self):
         #TODO: switch to real file once tested
@@ -685,7 +709,8 @@ class PWControl(object):
                 f.write("%5d, %8.2f\n" % (ts, usage,))
                 self.curfile.write("%s, %.2f\n" % (mac, usage))
                 #debug("MQTT put value in qpub")
-                qpub.put(("power", ts, mac, usage))
+                msg = str('{"typ":"pwpower","ts":%d,"mac":"%s","power":%.2f}' % (ts, mac, usage))
+                qpub.put(("power", mac, msg))
             except ValueError:
                 #print("%5d, " % (ts,))
                 f.write("%5d, \n" % (ts,))
@@ -837,7 +862,8 @@ class PWControl(object):
                     prev_dt = dt                
                     f.write("%s, %s, %s\n" % (ts_str, watt, watt_hour))
                     #debug("MQTT put value in qpub")
-                    qpub.put(("energy", ts_str, mac, watt.strip(), watt_hour.strip()))
+                    msg = str('{"typ":"pwenergy","ts":%s,"mac":"%s","power":%s,"energy":%s}' % (ts_str, mac, watt.strip(), watt_hour.strip()))
+                    qpub.put(("energy", mac, msg))
             if not f == None:
                 f.close()
                 
