@@ -1,0 +1,9 @@
+sitemap mqtttest label="Plugwsie2py"
+{
+	Frame {
+		Group item=gCtrl label="Plugwise control" icon="switch"
+		Group item=gPowr label="Energy consumption" icon="energy"
+		Group item=gProd label="Energy production" icon="sun"
+		Group item=gState label="Circle state" icon="temperature"
+	}
+}

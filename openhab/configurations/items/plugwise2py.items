@@ -1,0 +1,79 @@
+Group All
+Group gCtrl			(All)
+Group gState 		(All)
+Group gPowr 		(All)
+Group gProd 		(All)
+
+Group PWSwitch		(All)
+Group PWState		(All)
+
+//Group gLights 		(All, gCtrl)
+
+/* active groups */
+/*
+Group:Switch:OR(ON, OFF) 		gLights 		"All Lights [(%d)]"  (All,gCtrl)
+*/
+
+/* Plugwise Circles */
+/* Switch sending switch command, and responding to status update message */
+Switch SWI_Corridor 	"Corridor" 		(PWSwitch, gCtrl) 
+	{mqtt="	>[sevenw:plugwise2py/cmd/switch/000D6F0001Amac01:command:*:JS(pw2py-cmdswitch.js)],
+			<[sevenw:plugwise2py/state/circle/000D6F0001Amac01:state:JS(pw2py-switch.js)]"}
+			
+/* Power display item, which can request updates through commands issued in a rule */			
+String POW_Corridor "Corridor [%s]" <energy> (PWState, gCtrl) 
+	{mqtt="	>[sevenw:plugwise2py/cmd/reqstate/000D6F0001Amac01:command:*:JS(pw2py-reqstate.js)],
+			<[sevenw:plugwise2py/state/circle/000D6F0001Amac01:state:JS(pw2py-power8s-s.js)]"}
+			
+/* Switch state feedback reflecting the actual switch state with on/off icon */			
+String STA_Corridor "Corridor [%s]" <socket> (gCtrl) 
+	{mqtt="	<[sevenw:plugwise2py/state/circle/000D6F0001Amac01:state:JS(pw2py-circleonoff.js)]"}
+
+/* Power monitor acting on 10-seconds continuous logging by plugwise2py */
+Number MON_PV1 "Solar PV-1 Power [%.1f W]" <sun> (gProd)
+    {mqtt="	<[sevenw:plugwise2py/state/power/000D6F0001Amac02:state:JS(pw2py-monitor.js)]"}	
+Number MON_PV2 "Solar PV-2 Power [%.1f W]" <sun> (gProd)
+    {mqtt="	<[sevenw:plugwise2py/state/power/000D6F0001Amac04:state:JS(pw2py-monitor.js)]"}	
+	
+
+
+/* Energy logging form the 60 (1-60) minutes Circle memory buffers */
+Number ENE_PV1 "Solar PV-1 Energy [%.3f kWh]" <sun> (gProd)
+    {mqtt="	<[sevenw:plugwise2py/state/energy/000D6F0001Amac02:state:JS(pw2py-energy.js)]"}		
+Number ENE_PV2 "Solar PV-2 Energy [%.3f kWh]" <sun> (gProd)
+    {mqtt="	<[sevenw:plugwise2py/state/energy/000D6F0001Amac03:state:JS(pw2py-energy.js)]"}	
+
+Number ENE_Circle4 "Circle 4 Energy [%.3f kWh]" <energy> (gPowr)
+    {mqtt="	<[sevenw:plugwise2py/state/energy/000D6F0001Amac07:state:JS(pw2py-energy.js)]"}		
+Number ENE_Circle7 "Videotheek Energy [%.3f kWh]" <energy> (gPowr)
+    {mqtt="	<[sevenw:plugwise2py/state/energy/000D6F0001Amac05:state:JS(pw2py-energy.js)]"}	
+
+Number MON_Circle7 "Videotheek Power [%.1f W]" <energy> (gPowr)
+    {mqtt="	<[sevenw:plugwise2py/state/power/000D6F0001Amac05:state:JS(pw2py-monitor.js)]"}	
+
+/* Power 1 hour average on request (through cron rule) */
+Number P1H_Circle7 "Videotheek Average 1h Power [%.1f W]" <energy> (PWState, gPowr)
+    {mqtt="	>[sevenw:plugwise2py/cmd/reqstate/000D6F0001Amac05:command:*:JS(pw2py-reqstate.js)],
+			<[sevenw:plugwise2py/state/circle/000D6F0001Amac05:state:JS(pw2py-power1h.js)]"}
+	
+Switch SWI_Aquarium 	"Aquarium" 		(PWSwitch, gCtrl) 
+	{mqtt="	>[sevenw:plugwise2py/cmd/switch/000D6F0001Amac06:command:*:JS(pw2py-cmdswitch.js)],
+			<[sevenw:plugwise2py/state/circle/000D6F0001Amac06:state:JS(pw2py-switch.js)]"}
+			
+/* Power display item, which can request updates through commands issued in a rule */			
+String POW_Aquarium 	"Aquarium [%s]" <energy> (PWState, gCtrl) 
+	{mqtt="	>[sevenw:plugwise2py/cmd/reqstate/000D6F0001Amac06:command:*:JS(pw2py-reqstate.js)],
+			<[sevenw:plugwise2py/state/circle/000D6F0001Amac06:state:JS(pw2py-power8s-s.js)]"}
+	
+/* Numerical Online-state item for graphs, which can request updates through commands issued in a rule */			
+Number ONL_Circle4 	"Circle 4 online: [%d]" <energy> (PWState, gState) 
+	{mqtt="	>[sevenw:plugwise2py/cmd/reqstate/000D6F0001Amac07:command:*:JS(pw2py-reqstate.js)],
+			<[sevenw:plugwise2py/state/circle/000D6F0001Amac07:state:JS(pw2py-online-n.js)]"}
+	
+/* Circle full state item, which can request updates through commands issued in a rule */			
+String INF_Circle4 	"Circle 4 state: [%s]" <energy> (PWState, gState) 
+	{mqtt="	>[sevenw:plugwise2py/cmd/reqstate/000D6F0001Amac07:command:*:JS(pw2py-reqstate.js)],
+			<[sevenw:plugwise2py/state/circle/000D6F0001Amac07:state:JS(pw2py-fullstate.js)]"}
+
+			
+	

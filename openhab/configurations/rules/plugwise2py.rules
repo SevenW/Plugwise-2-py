@@ -1,0 +1,106 @@
+import org.openhab.core.library.types.*
+import org.openhab.core.persistence.*
+import org.openhab.model.script.actions.*
+import org.openhab.core.library.items.*
+
+var Timer inittimer 
+var int initcnt
+var Timer timer
+
+
+rule Start
+when 
+	System started
+then
+	say("Plugwise rules loaded")
+end
+
+rule Stop
+when 
+	System shuts down
+then
+	say("Plugwise exiting")
+end
+
+rule "Plugwise2py initialize from Circles"
+	when
+		System started
+	then
+		//In the startup phase of openhab, sendCommands fail to result in sending a MQTT message
+		//Therefore a retry timer resends the commands until a proper state is found for the circle.
+		//PWState?.members.forEach(circle|say(circle))
+		inittimer = createTimer(now.plusSeconds(10)) [|
+			initcnt = 0
+			PWState?.members.forEach(circle|say(circle))
+			PWState?.members.filter[state != Uninitialized].forEach(circle| {
+				if (circle instanceof NumberItem) {
+					val v = new Float(circle.state.toString)
+					if ((v < -0.00005) && (v > -0.00015)) {
+						circle.sendCommand(-0.0001)
+						initcnt = initcnt + 1
+					}
+				} else if (circle.state.toString == "- W") {
+					circle.sendCommand("- W")
+					initcnt = initcnt + 1
+				}
+				}
+			)
+			PWState?.members.filter[state == Uninitialized].forEach(circle| {
+				if (circle instanceof NumberItem) {circle.sendCommand(-0.0001) } else {circle.sendCommand("- W")}
+				initcnt = initcnt + 1
+				}
+			)
+			//PWState?.members.filter[state == "- W" || state == Uninitialized].forEach(circle| {				
+			//	if (circle instanceof NumberItem) {circle.sendCommand(-0.0001) } else {circle.sendCommand("- W")}
+			//	initcnt = initcnt + 1
+			//	}
+			//)
+			if (initcnt > 0) {
+				inittimer.reschedule(now.plusSeconds(2))
+				say("Plugwise2py initialization sendCommand and rescheduled timer")
+			} else {
+				inittimer = null
+			}
+		]
+end
+
+rule "Periodic request plugwise state"
+when
+	Time cron "3 * * * * ?"
+then
+	//Send a command that actually is the items state.
+	//The item will show the command value, which is the same as its state.
+	PWState?.members.filter[state != Uninitialized].forEach(circle| circle.sendCommand(circle.state.toString))
+	PWState?.members.filter[state == Uninitialized].forEach(circle| {
+		if (circle instanceof NumberItem) {circle.sendCommand(-0.0001) } else {circle.sendCommand("- W")}
+		}
+	)
+end
+	
+//After switching the circle, it takes 8 seconds until the switch
+//has a proper power recording. Query state 10 seconds after switching.
+rule "Update circle state 10 seconds after switch"
+when
+    //Item SWI_Corridor changed
+    Item SWI_Corridor received command
+then
+        timer = createTimer(now.plusSeconds(10)) [|
+            //one of the following:
+			POW_Corridor.sendCommand(POW_Corridor.state.toString)
+			//STA_Corridor.sendCommand(STA_Corridor.state)
+        ]
+end
+
+//After switching the circle, it takes 8 seconds until the switch
+//has a proper power recording. Query state 10 seconds after switching.
+rule "Update circle state 10 seconds after switch"
+when
+    //Item SWI_Corridor changed
+    Item SWI_Aquarium received command
+then
+        timer = createTimer(now.plusSeconds(10)) [|
+            //one of the following:
+			POW_Aquarium.sendCommand(POW_Aquarium.state.toString)
+			//STA_Corridor.sendCommand(STA_Corridor.state)
+        ]
+end
