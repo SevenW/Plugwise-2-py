@@ -161,11 +161,20 @@ class PWControl(object):
         #retrieve last log addresses from persistent storage
         with open(self.lastlogfname, 'r+') as f:
             for line in f:
-                mac, logaddr = line.split(',')
+                parts = line.split(',')
+                mac, logaddr = parts[0:2]
+                if len(parts) == 4:
+                    idx = int(parts[2])
+                    ts = int(parts[3])
+                else:
+                    idx = 0
+                    ts = 0
                 logaddr =  int(logaddr)
-                #print ("mac -%s- logaddr -%s-" % (mac, logaddr))
+                debug("mac -%s- logaddr -%s- logaddr_idx -%s- logaddr_ts -%s-" % (mac, logaddr, idx, ts))
                 try:
                     self.circles[self.bymac[mac]].last_log = logaddr
+                    self.circles[self.bymac[mac]].last_log_idx = idx
+                    self.circles[self.bymac[mac]].last_log_ts = ts
                 except:
                     error("PWControl.__init__(): lastlog mac not found in circles")
          
@@ -178,12 +187,16 @@ class PWControl(object):
         except:
             info("get_status_json: mac not found in circles or controls")
             return ""
-        status = c.get_status()
-        status["monitor"] = (control['monitor'].lower() == 'yes')
-        status["savelog"] = (control['savelog'].lower() == 'yes')
-        #json.encoder.FLOAT_REPR = lambda f: ("%.2f" % f)
-        #msg = json.dumps(status, default = jsondefault)
-        msg = json.dumps(status)
+        try:
+            status = c.get_status()
+            status["monitor"] = (control['monitor'].lower() == 'yes')
+            status["savelog"] = (control['savelog'].lower() == 'yes')
+            #json.encoder.FLOAT_REPR = lambda f: ("%.2f" % f)
+            #msg = json.dumps(status, default = jsondefault)
+            msg = json.dumps(status)
+        except (ValueError, TimeoutException, SerialException) as reason:
+            error("Error in get_status_json: %s" % (reason,))
+            msg = ""
         return str(msg)
         
     def log_status(self):
@@ -736,7 +749,7 @@ class PWControl(object):
         """
         fileopen = False
         if control['savelog'].lower() == 'yes':
-            #print("[%s: log to %s]" % (mac, fname))
+            info("%s: save log " % (mac,))
             try:
                 c = self.circles[self.bymac[mac]]
             except:
@@ -757,46 +770,94 @@ class PWControl(object):
                 return
             last = c_info['last_logaddr']
             first = c.last_log
+            idx = c.last_log_idx
+            if c.last_log_ts != 0:
+                last_dt = datetime.utcfromtimestamp(c.last_log_ts)-timedelta(seconds=time.timezone)
+            else:
+                last_dt = None
+
+            if last_dt ==None:
+                info("start with first %d, last %d, idx %d, last_dt None" % (first, last, idx))
+            else:
+                info("start with first %d, last %d, idx %d, last_dt %s" % (first, last, idx, last_dt.strftime("%Y-%m-%d %H:%M")))
             #check for buffer wrap around
             #The last log_idx is 6015. 6016 is for the range function
             if last < first:
                 if first >= 6016:
                     first = 0
                 else:
-                    last = 6016
-            last_dt = None
+                    #last = 6016
+                    #TODO: correct if needed
+                    last = 6015
             log = []
             try:
                 #read one more than request to determine interval of first measurement
-                if first>0:
+                #TODO: fix after reading debug log
+                if last_dt == None and first>0:
+                #if first>0:
                     powlist = c.get_power_usage_history(first-1)
                     last_dt = powlist[3][0]
+                    #The unexpected case where both consumpption and production are logged
+                    #Probably this case does not work at all
                     if powlist[1][0]==powlist[2][0]:
                        #not correct for out of sync usage and production buffer
                        #the returned value will be production only
                        last_dt=powlist[2][0]
+                    info("determine last_dt - buffer dts: %s %s %s %s" %
+                        (powlist[0][0].strftime("%Y-%m-%d %H:%M"),
+                        powlist[1][0].strftime("%Y-%m-%d %H:%M"),
+                        powlist[2][0].strftime("%Y-%m-%d %H:%M"),
+                        powlist[3][0].strftime("%Y-%m-%d %H:%M")))
                        
                 #loop over log addresses and write to file
-                for log_idx in range(first, last):
+                for log_idx in range(first, last+1):
                     buffer = c.get_power_usage_history(log_idx, last_dt)
-                    if len(buffer) == 4 or (len(buffer) == 2 and c.production == True):
-                        for i, (dt, watt, watt_hour) in enumerate(buffer):
-                            if not dt is None:
-                                #if the timestamp is identical to the previous, add production to usage
-                                #in case of hourly production logging, and end of daylightsaving, duplicate
-                                #timestamps can be present for two subsequent hours. Test the index
-                                #to be odd handles this.
-                                if dt == last_dt and c.production == True and i & 1:
-                                    tdt, twatt, twatt_hour = log[-1]
-                                    twatt+=watt
-                                    twatt_hour+=watt_hour
-                                    log[-1]=[tdt, twatt, twatt_hour]
-                                else:
-                                    log.append([dt, watt, watt_hour])
-                                debug("circle buffers: %s %d %s %d %d" % (mac, log_idx, dt.strftime("%Y-%m-%d %H:%M"), watt, watt_hour))
+                    idx = idx % 4
+                    info("len buffer: %d, production: %s" % (len(buffer), c.production))
+                    for i, (dt, watt, watt_hour) in enumerate(buffer):
+                        if i >= idx and not dt is None and dt >= last_dt:
+                            #if the timestamp is identical to the previous, add production to usage
+                            #in case of hourly production logging, and end of daylightsaving, duplicate
+                            #timestamps can be present for two subsequent hours. Test the index
+                            #to be odd handles this.
+                            idx = i + 1
+                            if dt == last_dt and c.production == True and i & 1:
+                                tdt, twatt, twatt_hour = log[-1]
+                                twatt+=watt
+                                twatt_hour+=watt_hour
+                                log[-1]=[tdt, twatt, twatt_hour]
+                            else:
+                                log.append([dt, watt, watt_hour])
+                            info("circle buffers: %s %d %s %d %d" % (mac, log_idx, dt.strftime("%Y-%m-%d %H:%M"), watt, watt_hour))
+                            info("proce with first %d, last %d, idx %d, last_dt %s" % (first, last, idx, last_dt.strftime("%Y-%m-%d %H:%M")))
                             last_dt = dt
-                    else:
-                        last -= 1
+
+                # if idx < 4:
+                    # #not completely read yet.
+                    # last -= 1
+                # if idx >= 4:
+                    # #not completely read yet.
+                    # last += 1
+                #idx = idx % 4    
+                    # #TODO: buffer is also len=4 for production?
+                    # if len(buffer) == 4 or (len(buffer) == 2 and c.production == True):
+                        # for i, (dt, watt, watt_hour) in enumerate(buffer):
+                            # if not dt is None:
+                                # #if the timestamp is identical to the previous, add production to usage
+                                # #in case of hourly production logging, and end of daylightsaving, duplicate
+                                # #timestamps can be present for two subsequent hours. Test the index
+                                # #to be odd handles this.
+                                # if dt == last_dt and c.production == True and i & 1:
+                                    # tdt, twatt, twatt_hour = log[-1]
+                                    # twatt+=watt
+                                    # twatt_hour+=watt_hour
+                                    # log[-1]=[tdt, twatt, twatt_hour]
+                                # else:
+                                    # log.append([dt, watt, watt_hour])
+                                # debug("circle buffers: %s %d %s %d %d" % (mac, log_idx, dt.strftime("%Y-%m-%d %H:%M"), watt, watt_hour))
+                            # last_dt = dt
+                    # else:
+                        # last -= 1
             except ValueError:
                 return
                 #error("Error: Failed to read power usage")
@@ -805,10 +866,17 @@ class PWControl(object):
                 #do nothing means that it is retried after one hour (next call to this function).
                 error("Error in log_recording() wile reading history buffers - %s" % (reason,))
                 return
-            
+                
+            info("end   with first %d, last %d, idx %d, last_dt %s" % (first, last, idx, last_dt.strftime("%Y-%m-%d %H:%M")))
+
             #update last_log outside try block.
             #this results in a retry at the next call to log_recording
             c.last_log = last
+            c.last_log_idx = idx
+            c.last_log_ts = calendar.timegm((last_dt+timedelta(seconds=time.timezone)).utctimetuple())
+            
+            
+            
             
             # if c.attr['loginterval'] <60:
                 # dayfname = self.daylogfnames[mac]                
@@ -862,7 +930,7 @@ class PWControl(object):
                     prev_dt = dt                
                     f.write("%s, %s, %s\n" % (ts_str, watt, watt_hour))
                     #debug("MQTT put value in qpub")
-                    msg = str('{"typ":"pwenergy","ts":%s,"mac":"%s","power":%s,"energy":%s}' % (ts_str, mac, watt.strip(), watt_hour.strip()))
+                    msg = str('{"typ":"pwenergy","ts":%s,"mac":"%s","power":%s,"energy":%s,"interval":%d}' % (ts_str, mac, watt.strip(), watt_hour.strip(),c.interval))
                     qpub.put(("energy", mac, msg))
             if not f == None:
                 f.close()
@@ -873,14 +941,14 @@ class PWControl(object):
             #store lastlog addresses to file
             with open(self.lastlogfname, 'w') as f:
                 for c in self.circles:
-                    f.write("%s, %d\n" % (c.mac, c.last_log))
+                    f.write("%s, %d, %d, %d\n" % (c.mac, c.last_log, c.last_log_idx, c.last_log_ts))
                             
         return fileopen #if fileopen actual writing to log files took place
         
-    def log_recordings(self):
-        debug("log_recordings")
-        for mac, idx in self.controlsbymac.iteritems():
-            self.log_recording(self.controls[idx], mac)
+    # def log_recordings(self):
+        # debug("log_recordings")
+        # for mac, idx in self.controlsbymac.iteritems():
+            # self.log_recording(self.controls[idx], mac)
 
     def test_offline(self):
         """
@@ -1087,6 +1155,12 @@ class PWControl(object):
             day = now.day
             hour = now.hour
             minute = now.minute
+            
+            #TODO: minute beat is test code. Remove
+            if minute != prev_minute:
+                logrecs = True
+                
+            
             if day != prev_day:
                 self.setup_actfiles()
             self.ten_seconds()

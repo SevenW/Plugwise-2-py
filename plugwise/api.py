@@ -38,6 +38,8 @@ import math
 from datetime import datetime, timedelta
 import calendar
 
+import logging
+
 from serial.serialutil import SerialException
 from .util import *
 from .protocol import *
@@ -283,6 +285,8 @@ class Circle(object):
             self.schedule_state = 'off'
         self.last_seen = calendar.timegm(datetime.datetime.utcnow().utctimetuple())
         self.last_log = 0
+        self.last_log_idx = 0
+        self.last_log_ts = 0
         
         self.power = [0, 0, 0, 0]
         self.power_ts = 0
@@ -416,6 +420,7 @@ class Circle(object):
         @param pulses: pulse counter
         @param seconds: over how many seconds were the pulses counted
         """
+        debug("PULSE: uncorrected: %.3f" % (pulses,))
         if pulses == 0:
             return 0.0
 
@@ -424,6 +429,8 @@ class Circle(object):
 
         pulses /= float(seconds)
         corrected_pulses = seconds * (((((pulses + self.off_noise)**2) * self.gain_b) + ((pulses + self.off_noise) * self.gain_a)) + self.off_tot)
+        debug("PULSE:   corrected: %.3f" % (pulses/seconds,))
+        debug("PULSE: t corrected: %.3f" % (pulses,))
         if (pulses > 0.0 and corrected_pulses < 0.0 or pulses < 0.0 and corrected_pulses > 0.0):
             return 0.0
         return corrected_pulses
@@ -486,9 +493,13 @@ class Circle(object):
         """
         pulse_1s, pulse_8s, pulse_1h, pulse_prod_1h = self.get_pulse_counters()
         kw_1s = 1000*self.pulses_to_kWs(self.pulse_correction(pulse_1s))
+        debug("POWER:          1s: %.3f" % (kw_1s,))
         kw_8s = 1000*self.pulses_to_kWs(self.pulse_correction(pulse_8s, 8))/8.0
+        debug("POWER:          8s: %.3f" % (kw_8s,))
         kw_1h = 1000*self.pulses_to_kWs(self.pulse_correction(pulse_1h, 3600))/3600.0
+        debug("POWER:          1h: %.3f" % (kw_1h,))
         kw_p_1h = 1000*self.pulses_to_kWs(self.pulse_correction(pulse_prod_1h, 3600))/3600.0
+        debug("POWER:     prod 1h: %.3f" % (kw_p_1h,))
         self.power = [kw_1s, kw_8s, kw_1h, kw_p_1h]
         self.power_ts = calendar.timegm(datetime.datetime.utcnow().utctimetuple())
         #just return negative values. It is production
@@ -579,8 +590,7 @@ class Circle(object):
         usage and production. Production values are negative, and have the same timestamp
         as their preceding usage value. The default is usage only with a 3600 sec = 1 hour
         interval. The interval and production can be set with set_log_interval().
-        are negatibve
-
+        
         @param log_buffer_index: index of the first log buffer to return.
             If None then current log buffer index is used
         @return: list of (datetime|None, average-watt-in-interval, watt-hours-in-this-interval)
