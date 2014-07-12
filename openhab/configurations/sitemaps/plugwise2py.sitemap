@@ -1,4 +1,4 @@
-sitemap mqtttest label="Plugwsie2py"
+sitemap Plugwise2py label="Plugwsie-2-py Control and Monitor"
 {
 	Frame {
 		Group item=gCtrl label="Plugwise control" icon="switch"

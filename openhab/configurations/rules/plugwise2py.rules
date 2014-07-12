@@ -2,36 +2,50 @@ import org.openhab.core.library.types.*
 import org.openhab.core.persistence.*
 import org.openhab.model.script.actions.*
 import org.openhab.core.library.items.*
+import org.joda.time.*
 
-var Timer inittimer 
+/* variables for switch */
+var Timer switchinittimer 
 var int initcnt
-var Timer timer
+var Timer switchedtimer1
+var Timer switchedtimer2
 
+/* variables for power and energy monitoring */
+var Timer energyinittimer
+var int eninitcnt
+var DateTime PV1_last_dt = now.minusDays(1)
+var DateTime PV2_last_dt = now.minusDays(1)
+var DateTime Circle0_last_dt = now.minusDays(1)
+var DateTime Circle1_last_dt = now.minusDays(1)
 
 rule Start
 when 
 	System started
 then
-	say("Plugwise rules loaded")
+	logInfo("Plugwise2py", "Plugwise rules loaded")
 end
 
 rule Stop
 when 
 	System shuts down
 then
-	say("Plugwise exiting")
+	logInfo("Plugwise2py", "Plugwise exiting")
 end
 
+/***********************************************************************************************/
+/* Plugwise switch section                                                                     */
+/* common rules                                                                                */
+/***********************************************************************************************/
 rule "Plugwise2py initialize from Circles"
 	when
 		System started
 	then
 		//In the startup phase of openhab, sendCommands fail to result in sending a MQTT message
 		//Therefore a retry timer resends the commands until a proper state is found for the circle.
-		//PWState?.members.forEach(circle|say(circle))
-		inittimer = createTimer(now.plusSeconds(10)) [|
+		//PWState?.members.forEach(circle|logInfo("Plugwise2py", circle))
+		switchinittimer = createTimer(now.plusSeconds(10)) [|
 			initcnt = 0
-			PWState?.members.forEach(circle|say(circle))
+			PWState?.members.forEach(circle|logInfo("Plugwise2py", circle.toString))
 			PWState?.members.filter[state != Uninitialized].forEach(circle| {
 				if (circle instanceof NumberItem) {
 					val v = new Float(circle.state.toString)
@@ -50,21 +64,17 @@ rule "Plugwise2py initialize from Circles"
 				initcnt = initcnt + 1
 				}
 			)
-			//PWState?.members.filter[state == "- W" || state == Uninitialized].forEach(circle| {				
-			//	if (circle instanceof NumberItem) {circle.sendCommand(-0.0001) } else {circle.sendCommand("- W")}
-			//	initcnt = initcnt + 1
-			//	}
-			//)
 			if (initcnt > 0) {
-				inittimer.reschedule(now.plusSeconds(2))
-				say("Plugwise2py initialization sendCommand and rescheduled timer")
+				switchinittimer.reschedule(now.plusSeconds(2))
+				logInfo("Plugwise2py", "Plugwise2py switch initialization sendCommand and rescheduled timer")
 			} else {
-				inittimer = null
+				switchinittimer = null
+				logInfo("Plugwise2py", "Plugwise2py switch initialization all online")
 			}
 		]
 end
 
-rule "Periodic request plugwise state"
+rule "Periodic request plugwise state for switchable circles"
 when
 	Time cron "3 * * * * ?"
 then
@@ -76,7 +86,10 @@ then
 		}
 	)
 end
-	
+
+/***********************************************************************************************/
+/* rules per switch                                                                            */
+/***********************************************************************************************/
 //After switching the circle, it takes 8 seconds until the switch
 //has a proper power recording. Query state 10 seconds after switching.
 rule "Update circle state 10 seconds after switch"
@@ -84,7 +97,7 @@ when
     //Item SWI_Corridor changed
     Item SWI_Corridor received command
 then
-        timer = createTimer(now.plusSeconds(10)) [|
+        switchedtimer1 = createTimer(now.plusSeconds(10)) [|
             //one of the following:
 			POW_Corridor.sendCommand(POW_Corridor.state.toString)
 			//STA_Corridor.sendCommand(STA_Corridor.state)
@@ -96,11 +109,107 @@ end
 rule "Update circle state 10 seconds after switch"
 when
     //Item SWI_Corridor changed
-    Item SWI_Aquarium received command
+    Item SWI_Circle1 received command
 then
-        timer = createTimer(now.plusSeconds(10)) [|
+        switchedtimer2 = createTimer(now.plusSeconds(10)) [|
             //one of the following:
-			POW_Aquarium.sendCommand(POW_Aquarium.state.toString)
+			POW_Circle1.sendCommand(POW_Circle1.state.toString)
 			//STA_Corridor.sendCommand(STA_Corridor.state)
         ]
 end
+
+/***********************************************************************************************/
+/* Solar PV production section                                                                 */
+/* Energy consumption section                                                                  */
+/***********************************************************************************************/
+rule "Initialize from Circles"
+	when
+		System started
+	then
+		//In the startup phase of openhab, sendCommands fail to result in sending a MQTT message
+		//Therefore a retry timer resends the commands until a proper state is found for the circle.
+		energyinittimer = createTimer(now.plusSeconds(15)) [|
+			eninitcnt = 0
+			if (ENE_INDAY_PV1.state == Uninitialized) {ENE_INDAY_PV1.postUpdate(0); eninitcnt = eninitcnt + 1}
+			if (ENE_INDAY_PV2.state == Uninitialized) {ENE_INDAY_PV2.postUpdate(0); eninitcnt = eninitcnt + 1}
+			if (ENE_INDAY_Corridor.state == Uninitialized) {ENE_INDAY_Corridor.postUpdate(0); eninitcnt = eninitcnt + 1}
+			if (ENE_INDAY_Circle1.state == Uninitialized) {ENE_INDAY_Circle1.postUpdate(0); eninitcnt = eninitcnt + 1}
+			if (eninitcnt > 0) {
+				energyinittimer.reschedule(now.plusSeconds(15))
+				logInfo("Plugwise2py", "Plugwise2py energy initialization sendCommand and rescheduled timer")
+			} else {
+				energyinittimer = null
+			}
+		]
+end
+
+rule "Periodic request plugwise state for monitoring"
+when
+	Time cron "27 0/2 * * * ?"
+then
+	//Send a command that actually is the items state.
+	//The item will show the command value, which is the same as its state.
+	PWMoni?.members.filter[state != Uninitialized].forEach(circle| circle.sendCommand(circle.state.toString))
+	PWMoni?.members.filter[state == Uninitialized].forEach(circle| {
+		if (circle instanceof NumberItem) {circle.sendCommand(-0.0001) } else {circle.sendCommand("- W")}
+		}
+	)
+end
+
+
+
+/***********************************************************************************************/
+/* rules per circle for power and energy consumption                                                                          */
+/***********************************************************************************************/
+rule "PV1 Todays energy production"
+when 
+	Item ENE_PV1 received update
+then
+	if (PV1_last_dt.getDayOfMonth != now.getDayOfMonth) {
+		ENE_DAY_PV1.postUpdate(ENE_INDAY_PV1.state as DecimalType)
+		ENE_INDAY_PV1.postUpdate(-ENE_PV1.state as DecimalType)
+	} else {
+		ENE_INDAY_PV1.postUpdate(ENE_INDAY_PV1.state as DecimalType - ENE_PV1.state as DecimalType)
+	}
+	PV1_last_dt = now
+end
+
+rule "PV2 Todays energy production"
+when 
+	Item ENE_PV2 received update
+then
+	if (PV2_last_dt.getDayOfMonth != now.getDayOfMonth) {
+		ENE_DAY_PV2.postUpdate(ENE_INDAY_PV2.state as DecimalType)
+		ENE_INDAY_PV2.postUpdate(-ENE_PV2.state as DecimalType)
+	} else {
+		ENE_INDAY_PV2.postUpdate(ENE_INDAY_PV2.state as DecimalType - ENE_PV2.state as DecimalType)
+	}
+	PV2_last_dt = now
+end
+
+rule "Corridor Todays energy production"
+when 
+	Item ENE_Corridor received update
+then
+	if (Circle0_last_dt.getDayOfMonth != now.getDayOfMonth) {
+		ENE_DAY_Corridor.postUpdate(ENE_INDAY_Corridor.state as DecimalType)
+		ENE_INDAY_Corridor.postUpdate(ENE_Corridor.state as DecimalType)
+	} else {
+		ENE_INDAY_Corridor.postUpdate(ENE_INDAY_Corridor.state as DecimalType + ENE_PV2.state as DecimalType)
+	}
+	Circle0_last_dt = now
+end
+
+rule "Circle1 Todays energy production"
+when 
+	Item ENE_Circle1 received update
+then
+	if (Circle1_last_dt.getDayOfMonth != now.getDayOfMonth) {
+		ENE_DAY_Circle1.postUpdate(ENE_INDAY_Circle1.state as DecimalType)
+		ENE_INDAY_Circle1.postUpdate(ENE_Circle1.state as DecimalType)
+	} else {
+		ENE_INDAY_Circle1.postUpdate(ENE_INDAY_Circle1.state as DecimalType + ENE_PV2.state as DecimalType)
+	}
+	Circle1_last_dt = now
+end
+

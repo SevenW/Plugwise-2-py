@@ -6,6 +6,7 @@ Group gProd 		(All)
 
 Group PWSwitch		(All)
 Group PWState		(All)
+Group PWMoni		(All)
 
 //Group gLights 		(All, gCtrl)
 
@@ -14,66 +15,100 @@ Group PWState		(All)
 Group:Switch:OR(ON, OFF) 		gLights 		"All Lights [(%d)]"  (All,gCtrl)
 */
 
-/* Plugwise Circles */
+/***********************************************************************************************/
+/* Plugwise switch section                                                                     */
+/***********************************************************************************************/
 /* Switch sending switch command, and responding to status update message */
 Switch SWI_Corridor 	"Corridor" 		(PWSwitch, gCtrl) 
-	{mqtt="	>[sevenw:plugwise2py/cmd/switch/000D6F0001Amac01:command:*:JS(pw2py-cmdswitch.js)],
-			<[sevenw:plugwise2py/state/circle/000D6F0001Amac01:state:JS(pw2py-switch.js)]"}
+	{mqtt="	>[sevenw:plugwise2py/cmd/switch/000D6F0001A_mac1:command:*:JS(pw2py-cmdswitch.js)],
+			<[sevenw:plugwise2py/state/circle/000D6F0001A_mac1:state:JS(pw2py-switch.js)]"}
 			
 /* Power display item, which can request updates through commands issued in a rule */			
 String POW_Corridor "Corridor [%s]" <energy> (PWState, gCtrl) 
-	{mqtt="	>[sevenw:plugwise2py/cmd/reqstate/000D6F0001Amac01:command:*:JS(pw2py-reqstate.js)],
-			<[sevenw:plugwise2py/state/circle/000D6F0001Amac01:state:JS(pw2py-power8s-s.js)]"}
+	{mqtt="	>[sevenw:plugwise2py/cmd/reqstate/000D6F0001A_mac1:command:*:JS(pw2py-reqstate.js)],
+			<[sevenw:plugwise2py/state/circle/000D6F0001A_mac1:state:JS(pw2py-power8s-s.js)]"}
 			
 /* Switch state feedback reflecting the actual switch state with on/off icon */			
 String STA_Corridor "Corridor [%s]" <socket> (gCtrl) 
-	{mqtt="	<[sevenw:plugwise2py/state/circle/000D6F0001Amac01:state:JS(pw2py-circleonoff.js)]"}
+	{mqtt="	<[sevenw:plugwise2py/state/circle/000D6F0001A_mac1:state:JS(pw2py-circleonoff.js)]"}
 
-/* Power monitor acting on 10-seconds continuous logging by plugwise2py */
-Number MON_PV1 "Solar PV-1 Power [%.1f W]" <sun> (gProd)
-    {mqtt="	<[sevenw:plugwise2py/state/power/000D6F0001Amac02:state:JS(pw2py-monitor.js)]"}	
-Number MON_PV2 "Solar PV-2 Power [%.1f W]" <sun> (gProd)
-    {mqtt="	<[sevenw:plugwise2py/state/power/000D6F0001Amac04:state:JS(pw2py-monitor.js)]"}	
-	
-
-
-/* Energy logging form the 60 (1-60) minutes Circle memory buffers */
-Number ENE_PV1 "Solar PV-1 Energy [%.3f kWh]" <sun> (gProd)
-    {mqtt="	<[sevenw:plugwise2py/state/energy/000D6F0001Amac02:state:JS(pw2py-energy.js)]"}		
-Number ENE_PV2 "Solar PV-2 Energy [%.3f kWh]" <sun> (gProd)
-    {mqtt="	<[sevenw:plugwise2py/state/energy/000D6F0001Amac03:state:JS(pw2py-energy.js)]"}	
-
-Number ENE_Circle4 "Circle 4 Energy [%.3f kWh]" <energy> (gPowr)
-    {mqtt="	<[sevenw:plugwise2py/state/energy/000D6F0001Amac07:state:JS(pw2py-energy.js)]"}		
-Number ENE_Circle7 "Videotheek Energy [%.3f kWh]" <energy> (gPowr)
-    {mqtt="	<[sevenw:plugwise2py/state/energy/000D6F0001Amac05:state:JS(pw2py-energy.js)]"}	
-
-Number MON_Circle7 "Videotheek Power [%.1f W]" <energy> (gPowr)
-    {mqtt="	<[sevenw:plugwise2py/state/power/000D6F0001Amac05:state:JS(pw2py-monitor.js)]"}	
-
-/* Power 1 hour average on request (through cron rule) */
-Number P1H_Circle7 "Videotheek Average 1h Power [%.1f W]" <energy> (PWState, gPowr)
-    {mqtt="	>[sevenw:plugwise2py/cmd/reqstate/000D6F0001Amac05:command:*:JS(pw2py-reqstate.js)],
-			<[sevenw:plugwise2py/state/circle/000D6F0001Amac05:state:JS(pw2py-power1h.js)]"}
-	
-Switch SWI_Aquarium 	"Aquarium" 		(PWSwitch, gCtrl) 
-	{mqtt="	>[sevenw:plugwise2py/cmd/switch/000D6F0001Amac06:command:*:JS(pw2py-cmdswitch.js)],
-			<[sevenw:plugwise2py/state/circle/000D6F0001Amac06:state:JS(pw2py-switch.js)]"}
+Switch SWI_Circle1 	"Circle 1" 		(PWSwitch, gCtrl) 
+	{mqtt="	>[sevenw:plugwise2py/cmd/switch/000D6F0001A_mac2:command:*:JS(pw2py-cmdswitch.js)],
+			<[sevenw:plugwise2py/state/circle/000D6F0001A_mac2:state:JS(pw2py-switch.js)]"}
 			
 /* Power display item, which can request updates through commands issued in a rule */			
-String POW_Aquarium 	"Aquarium [%s]" <energy> (PWState, gCtrl) 
-	{mqtt="	>[sevenw:plugwise2py/cmd/reqstate/000D6F0001Amac06:command:*:JS(pw2py-reqstate.js)],
-			<[sevenw:plugwise2py/state/circle/000D6F0001Amac06:state:JS(pw2py-power8s-s.js)]"}
+String POW_Circle1	"Circle 1 [%s]" <energy> (PWState, gCtrl) 
+	{mqtt="	>[sevenw:plugwise2py/cmd/reqstate/000D6F0001A_mac2:command:*:JS(pw2py-reqstate.js)],
+			<[sevenw:plugwise2py/state/circle/000D6F0001A_mac2:state:JS(pw2py-power8s-s.js)]"}
+
+
+
+/***********************************************************************************************/
+/* Solar PV production section                                                                 */
+/***********************************************************************************************/
+/* Power monitor acting on 10-seconds continuous logging by plugwise2py */
+Number MON_PV1 "Solar PV-1 Power [%.1f W]" <sun> (gProd)
+    {mqtt="	<[sevenw:plugwise2py/state/power/000D6F0001A_mac3:state:JS(pw2py-monitor-prod.js)]"}	
+Number MON_PV2 "Solar PV-2 Power [%.1f W]" <sun> (gProd)
+    {mqtt="	<[sevenw:plugwise2py/state/power/000D6F0001A_mac4:state:JS(pw2py-monitor-prod.js)]"}	
 	
+/* Average power logging form the 60 (1-60) minutes Circle memory buffers */
+Number AVG_PV1 "Solar PV-1 Avg Power [%.1f W]" <sun> (gProd)
+    {mqtt="	<[sevenw:plugwise2py/state/energy/000D6F0001A_mac3:state:JS(pw2py-avgpower-prod.js)]"}		
+Number AVG_PV2 "Solar PV-2 Avg Power [%.1f W]" <sun> (gProd)
+    {mqtt="	<[sevenw:plugwise2py/state/energy/000D6F0001A_mac4:state:JS(pw2py-avgpower-prod.js)]"}	
+
+/*  Total energy production for today. Integrated through rule*/
+Number ENE_INDAY_PV1 "Solar PV-1 Energy today [%.4f kWh]" <sun> (gProd)
+Number ENE_INDAY_PV2 "Solar PV-2 Energy today [%.4f kWh]" <sun> (gProd)
+
+/*  Total energy production for today. Integrated through rule*/
+Number ENE_DAY_PV1 "Solar PV-1 Energy yesterday [%.4f kWh]" <sun> (gProd)
+Number ENE_DAY_PV2 "Solar PV-2 Energy yesterday [%.4f kWh]" <sun> (gProd)
+
+/*  Energy produced in last interval from Circle buffers. MQTT connection. Not displayed.*/
+Number ENE_PV1 "Solar PV-1 Energy today [%.4f kWh]" <sun>
+    {mqtt="	<[sevenw:plugwise2py/state/energy/000D6F0001A_mac3:state:JS(pw2py-energy.js)]"}		
+Number ENE_PV2 "Solar PV-2 Energy today [%.4f kWh]" <sun>
+    {mqtt="	<[sevenw:plugwise2py/state/energy/000D6F0001A_mac4:state:JS(pw2py-energy.js)]"}	
+
+
+/***********************************************************************************************/
+/* Energy consumption section                                                                  */
+/***********************************************************************************************/
+Number MON_Corridor "Corridor Power [%.1f W]" <energy> (PWMoni, gPowr)
+    {mqtt="	<[sevenw:plugwise2py/state/power/000D6F0001A_mac1:state:JS(pw2py-monitor.js)],
+			<[sevenw:plugwise2py/state/circle/000D6F0001A_mac1:state:JS(pw2py-power8s-s.js)]"}	
+Number AVG_Corridor "Corridor Avg Power [%.1f W]" <energy> (gPowr)
+    {mqtt="	<[sevenw:plugwise2py/state/energy/000D6F0001A_mac1:state:JS(pw2py-avgpower.js)]"}		
+Number ENE_INDAY_Corridor "Corridor Energy today [%.4f kWh]" <energy> (gPowr)	
+Number ENE_DAY_Corridor "Corridor Energy yesterday [%.4f kWh]" <energy> (gPowr)	
+Number ENE_Corridor "Corridor Energy [%.4f kWh]" <energy>
+    {mqtt="	<[sevenw:plugwise2py/state/energy/000D6F0001A_mac1:state:JS(pw2py-energy.js)]"}		
+
+Number MON_Circle1 "Circle 1 Power [%.1f W]" <energy> (PWMoni, gPowr)
+    {mqtt="	<[sevenw:plugwise2py/state/power/000D6F0001A_mac2:state:JS(pw2py-monitor.js)],
+			<[sevenw:plugwise2py/state/circle/000D6F0001A_mac2:state:JS(pw2py-power8s-s.js)]"}	
+Number AVG_Circle1 "Circle 1 Avg Power [%.1f W]" <energy> (gPowr)
+    {mqtt="	<[sevenw:plugwise2py/state/energy/000D6F0001A_mac2:state:JS(pw2py-avgpower.js)]"}	
+Number ENE_INDAY_Circle1 "Circle 1 Energy today [%.4f kWh]" <energy> (gPowr)
+Number ENE_DAY_Circle1 "Circle 1 Energy yesterday [%.4f kWh]" <energy> (gPowr)
+Number ENE_Circle1 "Circle 1 Energy [%.4f kWh]" <energy>
+    {mqtt="	<[sevenw:plugwise2py/state/energy/000D6F0001A_mac2:state:JS(pw2py-energy.js)]"}		
+	
+
+/***********************************************************************************************/
+/* Extended PW circle state examples                                                           */
+/***********************************************************************************************/
 /* Numerical Online-state item for graphs, which can request updates through commands issued in a rule */			
-Number ONL_Circle4 	"Circle 4 online: [%d]" <energy> (PWState, gState) 
-	{mqtt="	>[sevenw:plugwise2py/cmd/reqstate/000D6F0001Amac07:command:*:JS(pw2py-reqstate.js)],
-			<[sevenw:plugwise2py/state/circle/000D6F0001Amac07:state:JS(pw2py-online-n.js)]"}
+Number ONL_Circle1 	"Aqarium online: [%d]" <energy> (PWState, gState) 
+	{mqtt="	>[sevenw:plugwise2py/cmd/reqstate/000D6F0001A_mac2:command:*:JS(pw2py-reqstate.js)],
+			<[sevenw:plugwise2py/state/circle/000D6F0001A_mac2:state:JS(pw2py-online-n.js)]"}
 	
 /* Circle full state item, which can request updates through commands issued in a rule */			
-String INF_Circle4 	"Circle 4 state: [%s]" <energy> (PWState, gState) 
-	{mqtt="	>[sevenw:plugwise2py/cmd/reqstate/000D6F0001Amac07:command:*:JS(pw2py-reqstate.js)],
-			<[sevenw:plugwise2py/state/circle/000D6F0001Amac07:state:JS(pw2py-fullstate.js)]"}
+String INF_Circle1 	"Circle 1 state: [%s]" <energy> (PWState, gState) 
+	{mqtt="	>[sevenw:plugwise2py/cmd/reqstate/000D6F0001A_mac2:command:*:JS(pw2py-reqstate.js)],
+			<[sevenw:plugwise2py/state/circle/000D6F0001A_mac2:state:JS(pw2py-fullstate.js)]"}
 
 			
 	
