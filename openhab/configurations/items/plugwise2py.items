@@ -79,7 +79,7 @@ Number ENE_PV2 "Solar PV-2 Energy today [%.4f kWh]" <sun>
 Number MON_Corridor "Corridor Power [%.1f W]" <energy> (PWMoni, gPowr)
     {mqtt="	>[sevenw:plugwise2py/cmd/reqstate/000D6F0001A_mac1:command:*:JS(pw2py-reqstate.js)],
 			<[sevenw:plugwise2py/state/power/000D6F0001A_mac1:state:JS(pw2py-monitor.js)],
-			<[sevenw:plugwise2py/state/circle/000D6F0001A_mac1:state:JS(pw2py-power8s-s.js)]"}	
+			<[sevenw:plugwise2py/state/circle/000D6F0001A_mac1:state:JS(pw2py-power8s.js)]"}	
 Number AVG_Corridor "Corridor Avg Power [%.1f W]" <energy> (gPowr)
     {mqtt="	<[sevenw:plugwise2py/state/energy/000D6F0001A_mac1:state:JS(pw2py-avgpower.js)]"}		
 Number ENE_INDAY_Corridor "Corridor Energy today [%.4f kWh]" <energy> (gPowr)	
@@ -90,7 +90,7 @@ Number ENE_Corridor "Corridor Energy [%.4f kWh]" <energy>
 Number MON_Circle1 "Circle 1 Power [%.1f W]" <energy> (PWMoni, gPowr)
     {mqtt="	>[sevenw:plugwise2py/cmd/reqstate/000D6F0001A_mac2:command:*:JS(pw2py-reqstate.js)],
 			<[sevenw:plugwise2py/state/power/000D6F0001A_mac2:state:JS(pw2py-monitor.js)],
-			<[sevenw:plugwise2py/state/circle/000D6F0001A_mac2:state:JS(pw2py-power8s-s.js)]"}	
+			<[sevenw:plugwise2py/state/circle/000D6F0001A_mac2:state:JS(pw2py-power8s.js)]"}	
 Number AVG_Circle1 "Circle 1 Avg Power [%.1f W]" <energy> (gPowr)
     {mqtt="	<[sevenw:plugwise2py/state/energy/000D6F0001A_mac2:state:JS(pw2py-avgpower.js)]"}	
 Number ENE_INDAY_Circle1 "Circle 1 Energy today [%.4f kWh]" <energy> (gPowr)
