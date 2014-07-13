@@ -195,7 +195,7 @@ then
 		ENE_DAY_Corridor.postUpdate(ENE_INDAY_Corridor.state as DecimalType)
 		ENE_INDAY_Corridor.postUpdate(ENE_Corridor.state as DecimalType)
 	} else {
-		ENE_INDAY_Corridor.postUpdate(ENE_INDAY_Corridor.state as DecimalType + ENE_PV2.state as DecimalType)
+		ENE_INDAY_Corridor.postUpdate(ENE_INDAY_Corridor.state as DecimalType + ENE_Corridor.state as DecimalType)
 	}
 	Circle0_last_dt = now
 end
@@ -208,7 +208,7 @@ then
 		ENE_DAY_Circle1.postUpdate(ENE_INDAY_Circle1.state as DecimalType)
 		ENE_INDAY_Circle1.postUpdate(ENE_Circle1.state as DecimalType)
 	} else {
-		ENE_INDAY_Circle1.postUpdate(ENE_INDAY_Circle1.state as DecimalType + ENE_PV2.state as DecimalType)
+		ENE_INDAY_Circle1.postUpdate(ENE_INDAY_Circle1.state as DecimalType + ENE_Circle1.state as DecimalType)
 	}
 	Circle1_last_dt = now
 end
