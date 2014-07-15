@@ -2,13 +2,14 @@ Plugwise-2-py
 =============
 
 #Key features:
-- MQTT interface for control and log meter readings
+- MQTT interface for control and log meter readings.
 - Log every 10-seconds in monitoring mode.
-- Read and log Circle metering buffers
-- Change interval of Circle metering buffers, e.g. every 2 minutes
+- Read and log Circle metering buffers.
+- Change interval of Circle metering buffers, e.g. every 2 minutes.
 - Enable production metering for e.g. PV solar energy.
-- Always-on option, cannot be overridden by switch command
-- Robust matching of commands and replies in Zigbee communication
+- Always-on option, cannot be overridden by switch command.
+- Robust matching of commands and replies in Zigbee communication.
+- Openhab interface through MQTT.
 
 ##Introduction
 Plugwise-2-py evolved in a monitoring and control server for plugwise devices.
