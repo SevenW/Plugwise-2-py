@@ -128,5 +128,10 @@ The circle does respond with a state message, from which it can be deduced wheth
 
 `plugwise2py/state/circle/000D6F0001Annnnn {.... "schedule": "off", "switch": "on" ....}`
 
+Openhab
+-------
+Openhab can communicate with Plugwise-2-py through a MQTT server. OPenhab provides a convenient system to operate switches and schedules. Also it can be used to record power readings and draw some graphs.
 
+TODO: Add a description.
+Example sitemap, items, rules and transforms can be found in the openhab folder in this repository
 
