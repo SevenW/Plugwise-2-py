@@ -9,7 +9,7 @@ Plugwise-2-py
 - Enable production metering for e.g. PV solar energy.
 - Always-on option, cannot be overridden by switch command
 
-#Introduction
+##Introduction
 Plugwise-2-py evolved in a monitoring and control server for plugwise devices.
 In v2.0 it can connect to a MQTT server. Commands to for example switch on a light can be given through the MQTT server, and when enabled, power readings are published as MQTT topics.
 Plugwise-2.py is a program is a logger of recorded meterings by plugwise.
@@ -43,9 +43,10 @@ installation:
 ```cd Plugwise-2-py```
 ```sudo python setup.py install```
 
-#config:
+##config:
 
 In pw-hostconfig.json edit tmp_path, permanent_path, log_path and serial
+
 ```{"permanent_path": "/home/pi/datalog", "tmp_path": "/tmp", "serial": "/dev/ttyUSB0"}```
 
 Edit the proper Circle mac addresses in pw-conf.json and pw-control.json. Make more changes as appropriate to your needs.
@@ -54,14 +55,25 @@ Edit the proper Circle mac addresses in pw-conf.json and pw-control.json. Make m
 
 Note: At first start-up, it starts reading the Circle internal metering buffers form position zero up to the current time. Worst case it can read for three years worth of readings. This may take form several minutes to several hours.
 Monitor this activity bu tailing the log file:
+
 `tail -f /var/log/pw-logger.log`
 
+MQTT can be enable by adding two key,values to pw-hostconfig.json
 
-#run:
+`"mqtt_ip": "127.0.0.1", "mqtt_port": "1883"`
+
+An example config file can be found in pw-hostconfig-mqtt.json
+
+Plugwise-2-py provides a MQTT-client. A separate MQTT-server like Mosquitto needs to be installed to enable MQTT in Plugwise-2-py. On Ubuntu systems it can be done like this:
+
+`sudo apt-get install mosquitto`
+The default port is 1883.
+
+##run:
 
 ```nohup python Plugwise-2.py >>/tmp/pwout.log&```
 
-#debug:
+##debug:
 the log level can be programmed in pw-control.json. Changes are picked up latest after 10 seconds.
 `"log_level": "info"` can have values error, info, debug
 `"log_comm": "no"` can have values no and yes. 
@@ -73,6 +85,7 @@ MQTT
 power readings can be published
 - autonomous
 - on request
+
 ###Autonomous
 Autonomous messages are published when monitoring = "yes" and when savelog = "yes". The 10-seconds monitoring published messages:
 `plugwise2py/state/power/000D6F0001Annnnn {"typ":"pwpower","ts":1405452425,"mac":"000D6F0001Annnnn","power":9.78}`
