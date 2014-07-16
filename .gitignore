@@ -5,7 +5,7 @@ my_*
 /logger
 /dist
 /build
-/Plugwise_2_py.egg-info
+/plugwise2py.egg-info
 
 #misc
 plugwise/mosquitto.py
