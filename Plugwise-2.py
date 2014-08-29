@@ -793,21 +793,31 @@ class PWControl(object):
             try:
                 #read one more than request to determine interval of first measurement
                 #TODO: fix after reading debug log
-                if last_dt == None and first>0:
-                #if first>0:
-                    powlist = c.get_power_usage_history(first-1)
-                    last_dt = powlist[3][0]
-                    #The unexpected case where both consumpption and production are logged
-                    #Probably this case does not work at all
-                    if powlist[1][0]==powlist[2][0]:
-                       #not correct for out of sync usage and production buffer
-                       #the returned value will be production only
-                       last_dt=powlist[2][0]
-                    info("determine last_dt - buffer dts: %s %s %s %s" %
-                        (powlist[0][0].strftime("%Y-%m-%d %H:%M"),
-                        powlist[1][0].strftime("%Y-%m-%d %H:%M"),
-                        powlist[2][0].strftime("%Y-%m-%d %H:%M"),
-                        powlist[3][0].strftime("%Y-%m-%d %H:%M")))
+                if last_dt == None:
+                    if first>0:
+                        powlist = c.get_power_usage_history(first-1)
+                        last_dt = powlist[3][0]
+                        #The unexpected case where both consumption and production are logged
+                        #Probably this case does not work at all
+                        if powlist[1][0]==powlist[2][0]:
+                           #not correct for out of sync usage and production buffer
+                           #the returned value will be production only
+                           last_dt=powlist[2][0]
+                        info("determine last_dt - buffer dts: %s %s %s %s" %
+                            (powlist[0][0].strftime("%Y-%m-%d %H:%M"),
+                            powlist[1][0].strftime("%Y-%m-%d %H:%M"),
+                            powlist[2][0].strftime("%Y-%m-%d %H:%M"),
+                            powlist[3][0].strftime("%Y-%m-%d %H:%M")))
+                    elif first == 0:
+                        powlist = c.get_power_usage_history(0)
+                        if powlist[0][0] is not None and powlist[1][0] is not None:
+                            last_dt = powlist[0][0]
+                            #subtract the interval between index 0 and 1
+                            last_dt -= powlist[1][0] - powlist[0][0]
+                        else:
+                            #last_dt cannot be determined yet. wait for 2 hours of recordings. return.
+                            info("log_recording: last_dt cannot be determined. circles did not record data yet.")
+                            return
                        
                 #loop over log addresses and write to file
                 for log_idx in range(first, last+1):
