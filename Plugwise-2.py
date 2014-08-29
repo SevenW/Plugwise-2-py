@@ -729,7 +729,7 @@ class PWControl(object):
                 f.write("%5d, \n" % (ts,))
                 self.curfile.write("%s, \n" % (mac,))
             except (TimeoutException, SerialException) as reason:
-                #for contineous monitoring just retry
+                #for continuous monitoring just retry
                 error("Error in ten_seconds(): %s" % (reason,))
             f.flush()
             #prevent backlog in command queue
