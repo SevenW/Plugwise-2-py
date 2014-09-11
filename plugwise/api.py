@@ -279,6 +279,7 @@ class Circle(object):
         self.online = False
         self.initialized = False
         self.relay_state = '?'
+        self.switch_state = '?'
         self.schedule_state = '?'
         if self.attr['always_on'] != 'False':
             #self.relay_state = 'on'
@@ -318,6 +319,7 @@ class Circle(object):
         retd["lastseen"] = self.last_seen
         retd["readonly"] = (self.attr['always_on'] != 'False')
         retd["switch"] = self.relay_state
+        retd["switchreq"] = self.switch_state
         retd["schedule"] = self.schedule_state
         if self.schedule != None:
             retd["schedname"] = self.schedule.name
@@ -566,13 +568,15 @@ class Circle(object):
         if on == True:
             if resp.status.value != 0xD8:
                 error("Wrong switch status reply when  switching on. expected '00D8', received '%04X'" % (resp.status.value,))
+            self.switch_state = 'on'
             self.relay_state = 'on'
-            self.schedule_state = 'off'        
+            self.schedule_state = 'off'
         else:
             if resp.status.value != 0xDE:
                 error("Wrong switch status reply when switching off. expected '00DE', received '%04X'" % (resp.status.value,))
-            self.relay_state = 'off'        
-            self.schedule_state = 'off'        
+            self.switch_state = 'off'
+            self.relay_state = 'off'
+            self.schedule_state = 'off'
         return 
 
     def switch_on(self):
@@ -756,6 +760,8 @@ class Circle(object):
             if resp.status.value != 0xE4:
                 error("Wrong schedule status reply when setting schedule on. expected '00E4', received '%04X'" % (resp.status.value,))
             self.schedule_state = 'on'
+            #update self.relay_state
+            self.get_info()
         else:
             if resp.status.value != 0xE5:
                 error("Wrong schedule status reply when setting schedule off. expected '00E5', received '%04X'" % (resp.status.value,))
@@ -840,20 +846,20 @@ def response_to_dict(r):
     return retd
 
 class Schedule(object):
-    """Schedule for cirlces(+) to control timed On/Off/StandByKiller
+    """Schedule for circles(+) to control timed On/Off/StandByKiller
     A value per 15 minutes 24/7, 672 values (int) in total
     -1 = On
     0  = Off
-    >0 = StandbyKiller treshhold in Watt
-    The objects can exist meaingful in the context of a circle only, as 
-    calibration data is required voor conversion to pulses and CRC calculation
+    >0 = StandbyKiller threshold in Watt
+    The objects can exist meaningful in the context of a circle only, as 
+    calibration data is required for conversion to pulses and CRC calculation
     """
     
     def __init__(self, name, scheddata, convertor):
         """
         ......
         """
-        self.name = name
+        self.name = str(name)
         self.dst = 0
         self._watt = scheddata
         self._pulse = list(int(convertor(i)) if i>=0 else i for i in self._watt)

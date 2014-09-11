@@ -36,6 +36,7 @@ import os
 import logging
 import Queue
 import threading
+import itertools
 
 mqtt = True
 try:
@@ -53,7 +54,6 @@ import json
 #encoder.FLOAT_REPR = lambda o: format(o, '.2f')
 json.encoder.FLOAT_REPR = lambda f: ("%.2f" % f)
 
-
 def jsondefault(o):
     return o.__dict__
 
@@ -61,7 +61,8 @@ def jsondefault(o):
 plugwise.util.LOG_COMMUNICATION = True
 #plugwise.util.LOG_LEVEL = 2
 
-cfg = json.load(open("pw-hostconfig.json"))
+schedules_path = "config/schedules"
+cfg = json.load(open("config/pw-hostconfig.json"))
 tmppath = cfg['tmp_path']+'/'
 perpath = cfg['permanent_path']+'/'
 logpath = cfg['log_path']+'/'
@@ -103,7 +104,7 @@ if rsyncing:
     perfile = perpath + yrfolder + actdir + actpre + now.date().isoformat() + '*' + actpost
     cmd = "rsync -aXuq " +  perfile + " " + tmppath + yrfolder + actdir
     subprocess.call(cmd, shell=True)
-
+ 
 class PWControl(object):
     """Main program class
     """
@@ -117,9 +118,9 @@ class PWControl(object):
         global curpost
                 
         self.device = Stick(port, timeout=1)
-        self.staticconfig_fn = 'pw-conf.json'
-        self.control_fn = 'pw-control.json'
-        self.schedule_fn = 'pw-schedules.json'
+        self.staticconfig_fn = 'config/pw-conf.json'
+        self.control_fn = 'config/pw-control.json'
+        #self.schedule_fn = 'config/pw-schedules.json'
         
         self.last_schedule_ts = None
         self.last_control_ts = None
@@ -178,7 +179,21 @@ class PWControl(object):
                 except:
                     error("PWControl.__init__(): lastlog mac not found in circles")
          
+        self.schedulesstat = dict ((f, os.path.getmtime(f)) for f in glob.glob(schedules_path+'/*.json'))
+        self.schedules = self.read_schedules()
         self.poll_configuration()
+
+    def get_relays(self):
+        """
+        Update the relay state for circles with schedules enabled.
+        """
+        for c in self.circles:
+            if c.online and c.schedule_state == 'on':
+                try:
+                    c.get_info()
+                except (TimeoutException, SerialException, ValueError) as reason:
+                    debug("Error in get_relays(): %s" % (reason,))
+                    continue
 
     def get_status_json(self, mac):
         try:
@@ -276,32 +291,31 @@ class PWControl(object):
     def read_schedules(self):
         #read schedules
         debug("read_schedules")
-        importedschedules = []
         newschedules = []
         self.schedulebyname = dict()
         newschedules.append(self.generate_test_schedule(-2))
-        self.schedulebyname['test-alternate']=0
+        self.schedulebyname['__PW2PY__test-alternate']=0
+        info("generate schedule: __PW2PY__test-alternate")
         newschedules.append(self.generate_test_schedule(10))
-        self.schedulebyname['test-10']=1
+        self.schedulebyname['__PW2PY__test-10']=1
+        info("generate schedule: __PW2PY__test-10")
         i=len(newschedules)
         
-        schedules = json.load(open(self.schedule_fn))        
-        for item in schedules['schedules']:        
-            #remove tabs which survive dialect='schedule'
-            for key in item:
-                if isinstance(item[key],str): item[key] = item[key].strip()
-            self.schedulebyname[item.get('Name')]=i
-            importedschedules.append(item)
-            i += 1
-
-        for schedule in importedschedules:
-            sched = ()
-            for i in range(0, 7):
-                sched += eval(schedule['Day_%d' % i].replace(';',','))
-            newschedules.append(sched)
-            #print sched
-            #print len(sched)
+        schedule_names = [os.path.splitext(os.path.basename(x))[0] for x in glob.glob(schedules_path+'/*.json')]
+        for sched_fn in schedule_names:
+            schedfpath = schedules_path+'/'+sched_fn+'.json'
+            try:
+                rawsched = json.load(open(schedfpath))
+                self.schedulebyname[sched_fn]=i
+                newschedules.append(list(itertools.chain.from_iterable(rawsched['schedule'])))
+                info("import   schedule: %s.json" % (sched_fn,))
+                #print("import   schedule: %s.json" % (sched_fn,))
+                i += 1
+            except:
+                error("Unable to read or parse schedule file %s" % (schedfpath,))            
+        
         return newschedules
+
 
     def apply_schedule_changes(self):
         """ in case off a failure to upload schedule,
@@ -309,7 +323,7 @@ class PWControl(object):
             self.test_offline() and self.apply_<func>_to_circle
         """
 
-        debug("apply_schedule_changes")
+        debug("apply_schedule_changes()")
         for c in self.circles:
             if not c.online:
                 continue
@@ -317,7 +331,8 @@ class PWControl(object):
                 if c.schedule.name in self.schedulebyname:
                     sched = self.schedules[self.schedulebyname[c.schedule.name]]
                     if sched != c.schedule._watt:
-                        info("apply_schedule_changes: schedule changed. Update in circle")
+                        info("apply_schedule_changes: schedule changed. Update in circle %s - %s" % (c.attr['name'], c.schedule.name))
+                        #print("apply_schedule_changes: schedule changed. Update in circle %s - %s" % (c.attr['name'], c.schedule.name))
                         #schedule changed so upload to this circle
                         c.define_schedule(c.schedule.name, sched, time.daylight)
                         try:
@@ -328,6 +343,8 @@ class PWControl(object):
                             #failure to upload schedule.
                             c.undefine_schedule() #clear schedule forces a retry at next call
                             error("Error during uploading schedule: %s" % (reason,))
+                else:
+                    error("Error during uploading schedule. Schedule %s not found." % (c.schedule.name,))
             
     def read_apply_controls(self):
         debug("read_apply_controls")
@@ -369,8 +386,9 @@ class PWControl(object):
         self.test_offline() will apply the control settings again by calling this function
         """
         self.apply_schedule_to_circle(control, mac, force)
-        self.apply_switch_to_circle(control, mac, force)
         self.apply_schedstate_to_circle(control, mac, force)
+        if control['schedule_state'] != 'on':
+            self.apply_switch_to_circle(control, mac, force)
 
     def apply_schedule_to_circle(self, control, mac, force=False):
         """apply control settings to circle
@@ -386,7 +404,7 @@ class PWControl(object):
             return False
 
         #load new schedule if required
-        schedname = control['schedule']
+        schedname = str(control['schedule'])
         #make sure the scheduleCRC read from circle is set
         try:
             c.get_clock()
@@ -399,8 +417,9 @@ class PWControl(object):
             if c.scheduleCRC != 17786:
                 #set always-on schedule in circle
                 info('circle mac: %s needs schedule to be undefined' % (mac,))
+                #print('circle mac: %s needs schedule to be undefined' % (mac,))
                 try:
-                    c.set_schedule_value(-1) 
+                    c.set_schedule_value(-1)
                 except (ValueError, TimeoutException, SerialException) as reason:
                     error("Error in apply_control_to_circle set always on schedule: %s" % (reason,))
                     return False
@@ -409,6 +428,7 @@ class PWControl(object):
                 sched = self.schedules[self.schedulebyname[schedname]]
                 if c.schedule is None or schedname != c.schedule.name:
                     info('circle mac: %s needs schedule to be defined' % (mac,))
+                    #print('circle mac: %s needs schedule to be defined' % (mac,))
                     #define schedule object for circle
                     c.define_schedule(schedname, sched, time.daylight)
                 #Only upload when mismatch in CRC
@@ -426,7 +446,7 @@ class PWControl(object):
                         error("Error in apply_control_to_circle load_schedule: %s" % (reason,))
                         return False
             except:
-                error("schedule name from controls not found in table of schedules")
+                error("schedule name from controls '%s' not found in table of schedules" % (schedname,))
         return True
                                     
     def apply_switch_to_circle(self, control, mac, force=False):
@@ -571,13 +591,37 @@ class PWControl(object):
         for fn in glob.iglob(tmpfiles):
              if time.time()-os.path.getmtime(fn) > cleanage:
                 os.unlink(fn)
-        
+            
+    def test_mtime(self, before, after):
+        modified = []
+        if after:
+            for (bf,bmod) in before.items():
+                if (after[bf] and after[bf] > bmod):
+                    modified.append(bf)
+        return modified
+     
     def poll_configuration(self):
         debug("poll_configuration()")
-        if self.last_schedule_ts != os.stat(self.schedule_fn).st_mtime:
-            self.last_schedule_ts = os.stat(self.schedule_fn).st_mtime
-            self.schedules = self.read_schedules() 
-            self.apply_schedule_changes()
+        before = self.schedulesstat
+        try:
+            after = dict ((f, os.path.getmtime(f)) for f in glob.glob(schedules_path+'/*.json'))
+            added = [f for f in after.keys() if not f in before.keys()]
+            removed = [f for f in before.keys() if not f in after.keys()]
+            modified = self.test_mtime(before,after)
+            if (added or removed or modified):
+                self.schedules = self.read_schedules()
+                self.schedulesstat = after
+                self.apply_schedule_changes()
+                #TODO: Remove. The schedule is changed, but not the schedule_state is switched on or off!
+                #for mac, idx in self.controlsbymac.iteritems():
+                #    self.apply_control_to_circle(self.controls[idx], mac, force=True)
+        except OSError as reason:
+            error("Error in poll_configuration(): %s" % (reason,))
+        
+        # if self.last_schedule_ts != os.stat(self.schedule_fn).st_mtime:
+            # self.last_schedule_ts = os.stat(self.schedule_fn).st_mtime
+            # self.schedules = self.read_schedules() 
+            # self.apply_schedule_changes()
         if self.last_control_ts != os.stat(self.control_fn).st_mtime:
             self.last_control_ts = os.stat(self.control_fn).st_mtime
             self.read_apply_controls()
@@ -613,6 +657,8 @@ class PWControl(object):
                 if val == "on" or val == "off":
                     control['switch_state'] = val
                     self.apply_switch_to_circle(control, mac)
+                    #switch command overrides schedule_state setting
+                    control['schedule_state'] = "off"
                 else:
                     error("MQTT command has invalid value %s" % (val,))
             elif cmd == "schedule":
@@ -638,60 +684,17 @@ class PWControl(object):
             updated = True
         if updated:
             self.write_control_file()
+            self.last_control_ts = os.stat(self.control_fn).st_mtime
 
     def publish_circle_state(self, mac):
-        # try:
-            # c = self.circles[self.bymac[mac]]
-            # control = self.controls[self.controlsbymac[mac]]
-        # except:
-            # info("mac from controls not found in circles")
-            # return
         qpub.put(("circle", mac, self.get_status_json(mac)))
 
     def write_control_file(self):
-        #TODO: switch to real file once tested
-        fjson = open("pw-control-test.json", 'w')
+        #write control file for testing purposes
+        fjson = open("config/pw-control.json", 'w')
         self.controlsjson['dynamic'] = self.controls
         json.dump(self.controlsjson, fjson)
         fjson.close()
-        #TODO: use correct file
-        self.last_control_ts = os.stat(self.control_fn).st_mtime
-        
-        # i=0
-        # for row in self.controlsjson['dynamic']:
-            # idx = self.controlsbymac[row['mac']]
-            # ctl = self.controls[idx]
-            # #update fields in json-dict
-            # row['switch_state'] = ctl['']
-            # row['name'] = ctl['']
-            # row['schedule_state'] = ctl['']
-            # row['schedule'] = ctl['']
-            # row['savelog'] = ctl['']
-            # row['monitor'] = ctl['']
-            # {"mac": "000D6F0001A59F7D", "switch_state": "on", "name": "circle+", "schedule_state": "off", "schedule": "", "savelog": "no", "monitor": "no"},
-            
-        # row=dict()
-        # row['']
-        
-        
-        # newcontrols = []
-        # for row in dr:
-            # #remove tabs which survive dialect='trimmed'
-            # for key in row:
-                # if isinstance(row[key],str): row[key] = row[key].strip()
-            # newcontrols.append(row)
-            # self.controlsbymac[row['mac']]=i
-            # i += 1
-            
-            # #generate JSON config to use as input in next update
-            # if i>1:
-                # fjson.write(",\n")
-            # json.dump(row, fjson)
-        # fjson.write(']}\n')
-        # fjson.close()
-        
-        # f.close()
-
      
     def ten_seconds(self):
         """
@@ -1166,10 +1169,13 @@ class PWControl(object):
             hour = now.hour
             minute = now.minute
             
-            #TODO: minute beat is test code. Remove
+            #read historic data only one circle per minute
             if minute != prev_minute:
                 logrecs = True
-                
+            
+            #get relays state just after each new quarter hour for circles operating a schedule.
+            if minute % 15 == 0 and now.second > 8:
+                self.get_relays()
             
             if day != prev_day:
                 self.setup_actfiles()
