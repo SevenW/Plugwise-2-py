@@ -36,6 +36,7 @@ import os
 import logging
 import Queue
 import threading
+import itertools
 
 mqtt = True
 try:
@@ -53,7 +54,6 @@ import json
 #encoder.FLOAT_REPR = lambda o: format(o, '.2f')
 json.encoder.FLOAT_REPR = lambda f: ("%.2f" % f)
 
-
 def jsondefault(o):
     return o.__dict__
 
@@ -61,7 +61,8 @@ def jsondefault(o):
 plugwise.util.LOG_COMMUNICATION = True
 #plugwise.util.LOG_LEVEL = 2
 
-cfg = json.load(open("pw-hostconfig.json"))
+schedules_path = "config/schedules"
+cfg = json.load(open("config/pw-hostconfig.json"))
 tmppath = cfg['tmp_path']+'/'
 perpath = cfg['permanent_path']+'/'
 logpath = cfg['log_path']+'/'
@@ -103,7 +104,7 @@ if rsyncing:
     perfile = perpath + yrfolder + actdir + actpre + now.date().isoformat() + '*' + actpost
     cmd = "rsync -aXuq " +  perfile + " " + tmppath + yrfolder + actdir
     subprocess.call(cmd, shell=True)
-
+ 
 class PWControl(object):
     """Main program class
     """
@@ -117,9 +118,9 @@ class PWControl(object):
         global curpost
                 
         self.device = Stick(port, timeout=1)
-        self.staticconfig_fn = 'pw-conf.json'
-        self.control_fn = 'pw-control.json'
-        self.schedule_fn = 'pw-schedules.json'
+        self.staticconfig_fn = 'config/pw-conf.json'
+        self.control_fn = 'config/pw-control.json'
+        #self.schedule_fn = 'config/pw-schedules.json'
         
         self.last_schedule_ts = None
         self.last_control_ts = None
@@ -128,6 +129,7 @@ class PWControl(object):
         self.schedules = []
         self.controls = []
         self.controlsjson = dict()
+        self.save_controls = False
         
         self.bymac = dict()
         self.byname = dict()
@@ -178,8 +180,25 @@ class PWControl(object):
                 except:
                     error("PWControl.__init__(): lastlog mac not found in circles")
          
+        self.schedulesstat = dict ((f, os.path.getmtime(f)) for f in glob.glob(schedules_path+'/*.json'))
+        self.schedules = self.read_schedules()
         self.poll_configuration()
 
+    def get_relays(self):
+        """
+        Update the relay state for circles with schedules enabled.
+        """
+        for c in self.circles:
+            if c.online and c.schedule_state == 'on':
+                try:
+                    c.get_info()
+                except (TimeoutException, SerialException, ValueError) as reason:
+                    debug("Error in get_relays(): %s" % (reason,))
+                    continue
+                #publish relay_state for schedule-operated circles.
+                #could also be done unconditionally every 15 minutes in main loop.
+                self.publish_circle_state(c.mac)
+                    
     def get_status_json(self, mac):
         try:
             c = self.circles[self.bymac[mac]]
@@ -276,32 +295,31 @@ class PWControl(object):
     def read_schedules(self):
         #read schedules
         debug("read_schedules")
-        importedschedules = []
         newschedules = []
         self.schedulebyname = dict()
         newschedules.append(self.generate_test_schedule(-2))
-        self.schedulebyname['test-alternate']=0
+        self.schedulebyname['__PW2PY__test-alternate']=0
+        info("generate schedule: __PW2PY__test-alternate")
         newschedules.append(self.generate_test_schedule(10))
-        self.schedulebyname['test-10']=1
+        self.schedulebyname['__PW2PY__test-10']=1
+        info("generate schedule: __PW2PY__test-10")
         i=len(newschedules)
         
-        schedules = json.load(open(self.schedule_fn))        
-        for item in schedules['schedules']:        
-            #remove tabs which survive dialect='schedule'
-            for key in item:
-                if isinstance(item[key],str): item[key] = item[key].strip()
-            self.schedulebyname[item.get('Name')]=i
-            importedschedules.append(item)
-            i += 1
-
-        for schedule in importedschedules:
-            sched = ()
-            for i in range(0, 7):
-                sched += eval(schedule['Day_%d' % i].replace(';',','))
-            newschedules.append(sched)
-            #print sched
-            #print len(sched)
+        schedule_names = [os.path.splitext(os.path.basename(x))[0] for x in glob.glob(schedules_path+'/*.json')]
+        for sched_fn in schedule_names:
+            schedfpath = schedules_path+'/'+sched_fn+'.json'
+            try:
+                rawsched = json.load(open(schedfpath))
+                self.schedulebyname[sched_fn]=i
+                newschedules.append(list(itertools.chain.from_iterable(rawsched['schedule'])))
+                info("import   schedule: %s.json" % (sched_fn,))
+                #print("import   schedule: %s.json" % (sched_fn,))
+                i += 1
+            except:
+                error("Unable to read or parse schedule file %s" % (schedfpath,))            
+        
         return newschedules
+
 
     def apply_schedule_changes(self):
         """ in case off a failure to upload schedule,
@@ -309,7 +327,7 @@ class PWControl(object):
             self.test_offline() and self.apply_<func>_to_circle
         """
 
-        debug("apply_schedule_changes")
+        debug("apply_schedule_changes()")
         for c in self.circles:
             if not c.online:
                 continue
@@ -317,17 +335,24 @@ class PWControl(object):
                 if c.schedule.name in self.schedulebyname:
                     sched = self.schedules[self.schedulebyname[c.schedule.name]]
                     if sched != c.schedule._watt:
-                        info("apply_schedule_changes: schedule changed. Update in circle")
+                        info("apply_schedule_changes: schedule changed. Update in circle %s - %s" % (c.attr['name'], c.schedule.name))
                         #schedule changed so upload to this circle
                         c.define_schedule(c.schedule.name, sched, time.daylight)
                         try:
+                            sched_state = c.schedule_state
+                            c.schedule_off()
                             c.load_schedule(time.daylight)
                             #update scheduleCRC
                             c.get_clock()
+                            if sched_state == 'on':
+                                c.schedule_on()
                         except (ValueError, TimeoutException, SerialException) as reason:
                             #failure to upload schedule.
                             c.undefine_schedule() #clear schedule forces a retry at next call
                             error("Error during uploading schedule: %s" % (reason,))
+                        self.publish_circle_state(c.mac)
+                else:
+                    error("Error during uploading schedule. Schedule %s not found." % (c.schedule.name,))
             
     def read_apply_controls(self):
         debug("read_apply_controls")
@@ -368,9 +393,27 @@ class PWControl(object):
         in case of a communication problem, c.online is set to False by api
         self.test_offline() will apply the control settings again by calling this function
         """
-        self.apply_schedule_to_circle(control, mac, force)
-        self.apply_switch_to_circle(control, mac, force)
-        self.apply_schedstate_to_circle(control, mac, force)
+        updated = self.apply_schedule_to_circle(control, mac, force)
+        c = self.circles[self.bymac[mac]]
+        debug('circle mac: %s before1 - state [r,sw,sc] %s %s %s - scname %s' % (mac, c.relay_state, control['switch_state'], control['schedule_state'], control['schedule']))
+        debug('circle mac: %s before2 - state [r,sw,sc] %s %s %s' % (c.mac, c.relay_state, c.switch_state, c.schedule_state))
+        updated = updated | self.apply_schedstate_to_circle(control, mac, force)
+        if control['schedule_state'] != 'on':
+            updated = updated | self.apply_switch_to_circle(control, mac, force)
+        else:
+            #prime the switch state for consistency between circle and control
+            try:
+                c = self.circles[self.bymac[mac]]
+                updated = updated | (c.switch_state != control['switch_state'])
+                c.switch_state = control['switch_state']
+            except:
+                info("mac from controls not found in circles while prime switch state")
+            
+        if updated:
+            self.publish_circle_state(mac)
+        debug('circle mac: %s after1 - state [r,sw,sc] %s %s %s - scname %s' % (mac, c.relay_state, control['switch_state'], control['schedule_state'], control['schedule']))
+        debug('circle mac: %s after2 - state [r,sw,sc] %s %s %s' % (c.mac, c.relay_state, c.switch_state, c.schedule_state))
+
 
     def apply_schedule_to_circle(self, control, mac, force=False):
         """apply control settings to circle
@@ -386,31 +429,42 @@ class PWControl(object):
             return False
 
         #load new schedule if required
-        schedname = control['schedule']
+        schedname = str(control['schedule'])
         #make sure the scheduleCRC read from circle is set
         try:
             c.get_clock()
         except (ValueError, TimeoutException, SerialException) as reason:
-            error("Error in apply_control_to_circle get_clock: %s" % (reason,))
+            error("Error in apply_schedule_to_circle get_clock: %s" % (reason,))
             return False
+        circle_changed = False
         if schedname == '':
             #no schedule specified.
-            c.schedule = None
+            try:
+                #only change schedules when schedule_state = off
+                c.schedule_off()
+            except (ValueError, TimeoutException, SerialException) as reason:
+                error("Error in apply_schedule_to_circle schedule_off: %s" % (reason,))
+
+            c.undefine_schedule()
             if c.scheduleCRC != 17786:
                 #set always-on schedule in circle
                 info('circle mac: %s needs schedule to be undefined' % (mac,))
+                #print('circle mac: %s needs schedule to be undefined' % (mac,))
                 try:
-                    c.set_schedule_value(-1) 
+                    c.set_schedule_value(-1)
                 except (ValueError, TimeoutException, SerialException) as reason:
-                    error("Error in apply_control_to_circle set always on schedule: %s" % (reason,))
+                    error("Error in apply_schedule_to_circle set always on schedule: %s" % (reason,))
                     return False
+                circle_changed = True
         else:
             try:                
                 sched = self.schedules[self.schedulebyname[schedname]]
-                if c.schedule is None or schedname != c.schedule.name:
+                if c.schedule is None or schedname != c.schedule.name or sched != c.schedule._watt:
                     info('circle mac: %s needs schedule to be defined' % (mac,))
+                    #print('circle mac: %s needs schedule to be defined' % (mac,))
                     #define schedule object for circle
                     c.define_schedule(schedname, sched, time.daylight)
+                    
                 #Only upload when mismatch in CRC
                 debug("apply_control_to_circle: compare CRC's: %d %d" %(c.schedule.CRC, c.scheduleCRC))
                 if  c.schedule.CRC != c.scheduleCRC or c.schedule.dst != time.daylight:
@@ -420,14 +474,13 @@ class PWControl(object):
                         c.load_schedule(time.daylight)
                         #update scheduleCRC
                         c.get_clock()
-                        #at least for dst_toggle
-                        force = True
                     except (ValueError, TimeoutException, SerialException) as reason:
                         error("Error in apply_control_to_circle load_schedule: %s" % (reason,))
                         return False
+                    circle_changed = True
             except:
-                error("schedule name from controls not found in table of schedules")
-        return True
+                error("schedule name from controls '%s' not found in table of schedules" % (schedname,))
+        return circle_changed
                                     
     def apply_switch_to_circle(self, control, mac, force=False):
         """apply control settings to circle
@@ -441,20 +494,22 @@ class PWControl(object):
             return False
         if not c.online:
             return False
+        switched = False
         #switch on/off if required
         sw_state = control['switch_state'].lower()
         if sw_state == 'on' or sw_state == 'off':
             sw = True if sw_state == 'on' else False
-            if force or sw_state != c.relay_state:
+            if force or sw_state != c.relay_state or sw_state != c.switch_state:
                 info('circle mac: %s needs to be switched %s' % (mac, sw_state))
                 try:
                     c.switch(sw)
                 except (ValueError, TimeoutException, SerialException) as reason:
                     error("Error in apply_control_to_circle failed to switch: %s" % (reason,))
                     return False
+                switched = True
         else:
             error('invalid switch_state value in controls file')
-        return (sw_state == c.relay_state)
+        return switched
 
     def apply_schedstate_to_circle(self, control, mac, force=False):
         """apply control settings to circle
@@ -467,8 +522,18 @@ class PWControl(object):
             info("mac from controls not found in circles")
             return False
         if not c.online:
+            print "offline"
             return False
-            
+        switched = False
+        
+        #force schedule_state to off when no schedule is defined
+        if ((not control['schedule']) or control['schedule'] == "") and control['schedule_state'].lower() == 'on':
+            control['schedule_state'] = 'off'
+            info('circle mac: %s schedule forced to off because no schedule defined' % (mac,))
+            self.write_control_file()
+            self.last_control_ts = os.stat(self.control_fn).st_mtime
+
+
         #switch schedule on/off if required
         sw_state = control['switch_state'].lower()
         sw = True if sw_state == 'on' else False
@@ -485,9 +550,10 @@ class PWControl(object):
                 except (ValueError, TimeoutException, SerialException) as reason:
                     error("Error in apply_control_to_circle failed to switch schedule: %s" % (reason,))
                     return False
+                switched = True
         else:
             error('invalid schedule_state value in controls file')
-        return (sc_state == c.schedule_state)
+        return switched
             
     def setup_actfiles(self):
         global tmppath
@@ -571,13 +637,37 @@ class PWControl(object):
         for fn in glob.iglob(tmpfiles):
              if time.time()-os.path.getmtime(fn) > cleanage:
                 os.unlink(fn)
-        
+            
+    def test_mtime(self, before, after):
+        modified = []
+        if after:
+            for (bf,bmod) in before.items():
+                if (after.has_key(bf) and after[bf] > bmod):
+                    modified.append(bf)
+        return modified
+     
     def poll_configuration(self):
         debug("poll_configuration()")
-        if self.last_schedule_ts != os.stat(self.schedule_fn).st_mtime:
-            self.last_schedule_ts = os.stat(self.schedule_fn).st_mtime
-            self.schedules = self.read_schedules() 
-            self.apply_schedule_changes()
+        before = self.schedulesstat
+        try:
+            after = dict ((f, os.path.getmtime(f)) for f in glob.glob(schedules_path+'/*.json'))
+            added = [f for f in after.keys() if not f in before.keys()]
+            removed = [f for f in before.keys() if not f in after.keys()]
+            modified = self.test_mtime(before,after)
+            if (added or removed or modified):
+                self.schedules = self.read_schedules()
+                self.schedulesstat = after
+                self.apply_schedule_changes()
+                #TODO: Remove. The schedule is changed, but not the schedule_state is switched on or off!
+                #for mac, idx in self.controlsbymac.iteritems():
+                #    self.apply_control_to_circle(self.controls[idx], mac, force=True)
+        except OSError as reason:
+            error("Error in poll_configuration(): %s" % (reason,))
+        
+        # if self.last_schedule_ts != os.stat(self.schedule_fn).st_mtime:
+            # self.last_schedule_ts = os.stat(self.schedule_fn).st_mtime
+            # self.schedules = self.read_schedules() 
+            # self.apply_schedule_changes()
         if self.last_control_ts != os.stat(self.control_fn).st_mtime:
             self.last_control_ts = os.stat(self.control_fn).st_mtime
             self.read_apply_controls()
@@ -612,14 +702,16 @@ class PWControl(object):
                 val = val.lower()
                 if val == "on" or val == "off":
                     control['switch_state'] = val
-                    self.apply_switch_to_circle(control, mac)
+                    updated = self.apply_switch_to_circle(control, mac)
+                    #switch command overrides schedule_state setting
+                    control['schedule_state'] = "off"
                 else:
                     error("MQTT command has invalid value %s" % (val,))
             elif cmd == "schedule":
                 val = val.lower()
                 if val == "on" or val == "off":
                     control['schedule_state'] = val
-                    self.apply_schedstate_to_circle(control, mac)
+                    updated = self.apply_schedstate_to_circle(control, mac)
                 else:
                     error("MQTT command has invalid value %s" % (val,))
             elif cmd == "setsched":
@@ -634,64 +726,20 @@ class PWControl(object):
                     info("Error in reading power for status update")
                 #return message is generic state message below
                 
-            self.publish_circle_state(mac)
-            updated = True
+            self.publish_circle_state(mac)            
         if updated:
             self.write_control_file()
+            self.last_control_ts = os.stat(self.control_fn).st_mtime
 
     def publish_circle_state(self, mac):
-        # try:
-            # c = self.circles[self.bymac[mac]]
-            # control = self.controls[self.controlsbymac[mac]]
-        # except:
-            # info("mac from controls not found in circles")
-            # return
         qpub.put(("circle", mac, self.get_status_json(mac)))
 
     def write_control_file(self):
-        #TODO: switch to real file once tested
-        fjson = open("pw-control-test.json", 'w')
+        #write control file for testing purposes
+        fjson = open("config/pw-control.json", 'w')
         self.controlsjson['dynamic'] = self.controls
         json.dump(self.controlsjson, fjson)
         fjson.close()
-        #TODO: use correct file
-        self.last_control_ts = os.stat(self.control_fn).st_mtime
-        
-        # i=0
-        # for row in self.controlsjson['dynamic']:
-            # idx = self.controlsbymac[row['mac']]
-            # ctl = self.controls[idx]
-            # #update fields in json-dict
-            # row['switch_state'] = ctl['']
-            # row['name'] = ctl['']
-            # row['schedule_state'] = ctl['']
-            # row['schedule'] = ctl['']
-            # row['savelog'] = ctl['']
-            # row['monitor'] = ctl['']
-            # {"mac": "000D6F0001A59F7D", "switch_state": "on", "name": "circle+", "schedule_state": "off", "schedule": "", "savelog": "no", "monitor": "no"},
-            
-        # row=dict()
-        # row['']
-        
-        
-        # newcontrols = []
-        # for row in dr:
-            # #remove tabs which survive dialect='trimmed'
-            # for key in row:
-                # if isinstance(row[key],str): row[key] = row[key].strip()
-            # newcontrols.append(row)
-            # self.controlsbymac[row['mac']]=i
-            # i += 1
-            
-            # #generate JSON config to use as input in next update
-            # if i>1:
-                # fjson.write(",\n")
-            # json.dump(row, fjson)
-        # fjson.write(']}\n')
-        # fjson.close()
-        
-        # f.close()
-
      
     def ten_seconds(self):
         """
@@ -729,7 +777,7 @@ class PWControl(object):
                 f.write("%5d, \n" % (ts,))
                 self.curfile.write("%s, \n" % (mac,))
             except (TimeoutException, SerialException) as reason:
-                #for contineous monitoring just retry
+                #for continuous monitoring just retry
                 error("Error in ten_seconds(): %s" % (reason,))
             f.flush()
             #prevent backlog in command queue
@@ -753,7 +801,7 @@ class PWControl(object):
             try:
                 c = self.circles[self.bymac[mac]]
             except:
-                info("mac from controls not found in circles")
+                error("mac from controls not found in circles")
                 return
             if not c.online:
                 return
@@ -777,13 +825,13 @@ class PWControl(object):
                 last_dt = None
 
             if last_dt ==None:
-                info("start with first %d, last %d, idx %d, last_dt None" % (first, last, idx))
+                debug("start with first %d, last %d, idx %d, last_dt None" % (first, last, idx))
             else:
-                info("start with first %d, last %d, idx %d, last_dt %s" % (first, last, idx, last_dt.strftime("%Y-%m-%d %H:%M")))
+                debug("start with first %d, last %d, idx %d, last_dt %s" % (first, last, idx, last_dt.strftime("%Y-%m-%d %H:%M")))
             #check for buffer wrap around
             #The last log_idx is 6015. 6016 is for the range function
             if last < first:
-                if first >= 6016:
+                if (first == 6015 and idx == 4) or first >= 6016:
                     first = 0
                 else:
                     #last = 6016
@@ -803,7 +851,7 @@ class PWControl(object):
                            #not correct for out of sync usage and production buffer
                            #the returned value will be production only
                            last_dt=powlist[2][0]
-                        info("determine last_dt - buffer dts: %s %s %s %s" %
+                        debug("determine last_dt - buffer dts: %s %s %s %s" %
                             (powlist[0][0].strftime("%Y-%m-%d %H:%M"),
                             powlist[1][0].strftime("%Y-%m-%d %H:%M"),
                             powlist[2][0].strftime("%Y-%m-%d %H:%M"),
@@ -823,7 +871,7 @@ class PWControl(object):
                 for log_idx in range(first, last+1):
                     buffer = c.get_power_usage_history(log_idx, last_dt)
                     idx = idx % 4
-                    info("len buffer: %d, production: %s" % (len(buffer), c.production))
+                    debug("len buffer: %d, production: %s" % (len(buffer), c.production))
                     for i, (dt, watt, watt_hour) in enumerate(buffer):
                         if i >= idx and not dt is None and dt >= last_dt:
                             #if the timestamp is identical to the previous, add production to usage
@@ -839,7 +887,7 @@ class PWControl(object):
                             else:
                                 log.append([dt, watt, watt_hour])
                             info("circle buffers: %s %d %s %d %d" % (mac, log_idx, dt.strftime("%Y-%m-%d %H:%M"), watt, watt_hour))
-                            info("proce with first %d, last %d, idx %d, last_dt %s" % (first, last, idx, last_dt.strftime("%Y-%m-%d %H:%M")))
+                            debug("proce with first %d, last %d, idx %d, last_dt %s" % (first, last, idx, last_dt.strftime("%Y-%m-%d %H:%M")))
                             last_dt = dt
 
                 # if idx < 4:
@@ -877,7 +925,7 @@ class PWControl(object):
                 error("Error in log_recording() wile reading history buffers - %s" % (reason,))
                 return
                 
-            info("end   with first %d, last %d, idx %d, last_dt %s" % (first, last, idx, last_dt.strftime("%Y-%m-%d %H:%M")))
+            debug("end   with first %d, last %d, idx %d, last_dt %s" % (first, last, idx, last_dt.strftime("%Y-%m-%d %H:%M")))
 
             #update last_log outside try block.
             #this results in a retry at the next call to log_recording
@@ -1166,10 +1214,13 @@ class PWControl(object):
             hour = now.hour
             minute = now.minute
             
-            #TODO: minute beat is test code. Remove
+            #read historic data only one circle per minute
             if minute != prev_minute:
                 logrecs = True
-                
+            
+            #get relays state just after each new quarter hour for circles operating a schedule.
+            if minute % 15 == 0 and now.second > 8:
+                self.get_relays()
             
             if day != prev_day:
                 self.setup_actfiles()
@@ -1211,9 +1262,9 @@ class PWControl(object):
             #update schedules after change in DST. Update one every ten seconds
             for c in self.circles:
                 if c.online and c.schedule != None and c.schedule.dst != time.daylight:
-                    info("Circle '%s' schedule shift due to DST changed." % (self.attr['name'],))
+                    info("Circle '%s' schedule shift due to DST changed." % (c.attr['name'],))
                     idx=self.controlsbymac[c.mac]
-                    self.apply_control_to_circle(self.controls[idx], c.mac)
+                    self.apply_control_to_circle(self.controls[idx], c.mac, force=True)
                     break
 
                 
