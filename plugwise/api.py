@@ -558,6 +558,7 @@ class Circle(object):
         """switch power on or off
         @param on: new state, boolean
         """
+        info("API  %s %s circle switch: %s" % (self.mac, self.attr["name"], 'on' if on else 'off',))
         if not isinstance(on, bool):
             return False
         if self.attr['always_on'] != 'False' and on != True:
@@ -636,8 +637,6 @@ class Circle(object):
                     intervals.append((dts[i]-prev_dt).total_seconds())               
                 prev2_dt = prev_dt
                 prev_dt = dts[i]
-        
-        #print dts, intervals, pulses
 
         retl = []        
         for i in range(0, len(dts)):
@@ -749,6 +748,7 @@ class Circle(object):
         """switch schedule on or off
         @param on: new state, boolean
         """
+        info("API  %s %s circle schedule %s" % (self.mac, self.attr["name"], 'on' if on else 'off'))
         if not isinstance(on, bool):
             return False
         if self.attr['always_on'] != 'False':
@@ -765,7 +765,7 @@ class Circle(object):
         else:
             if resp.status.value != 0xE5:
                 error("Wrong schedule status reply when setting schedule off. expected '00E5', received '%04X'" % (resp.status.value,))
-            self.schedule_state = 'off'        
+            self.schedule_state = 'off'  
         return 
 
     def schedule_on(self):
@@ -799,7 +799,7 @@ class Circle(object):
         log = self.get_power_usage_history(cur_idx)
         if len(log)<3:
             log = self.get_power_usage_history(cur_idx-1) + log
-        #print log
+        #debug(log)
         interval = log[-1][0]-log[-2][0]
         self.usage=True
         if interval == timedelta(0):
@@ -863,6 +863,7 @@ class Schedule(object):
         self.dst = 0
         self._watt = scheddata
         self._pulse = list(int(convertor(i)) if i>=0 else i for i in self._watt)
+        self._shift_day()
         self._hex = ''.join(("%04X" % int_to_uint(i,4)) for i in self._pulse)
         self.CRC = crc_fun(''.join(str(struct.pack('>h',i)) for i in self._pulse))
 
@@ -873,6 +874,12 @@ class Schedule(object):
         retd['schedule'] = self._watt
         return retd
         
+    def _shift_day(self):
+        info("circle.schedule._shift_day rotate left by one day")
+        #rotate schedule a day to the left
+        self._pulse = self._pulse[96:]+self._pulse[:96]
+        #self.CRC = crc_fun(''.join(str(struct.pack('>h',i)) for i in self._pulse))
+
     def _dst_shift(self, dst):
         if self.dst and not dst:
             info("circle.schedule._dst_shift rotate right [end of DST]")
