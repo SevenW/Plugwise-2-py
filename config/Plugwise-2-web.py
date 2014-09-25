@@ -23,44 +23,23 @@ import sys
 import time
 import logging
 import logging.handlers
-import string,cgi,time
-import os
-from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
-import mimetypes
-import json
+import string
+import cgi
 import urlparse
-#import urllib #can be used to unquote HTTP payload
+import mimetypes
+import os
 import glob
+import json
 
-#setup logging
-def init_logger(logfname, appname='plugwise-2-web'):
-    global pw_logger
-    pw_logger = logging.getLogger(appname)
-    log_level()
-    # Add the log message handler to the logger
-    handler = logging.handlers.RotatingFileHandler(logfname, maxBytes=50000, backupCount=3)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    handler.setFormatter(formatter)
-    pw_logger.addHandler(handler)
-    pw_logger.info("logging started")
-   
-def log_level(level=logging.DEBUG):
-    pw_logger.setLevel(level)
+import threading
+from SocketServer import ThreadingMixIn
+from BaseHTTPServer import HTTPServer
+from SimpleHTTPServer import SimpleHTTPRequestHandler
 
-def debug(msg):
-    #if __debug__ and DEBUG_PROTOCOL:
-        #print("%s: %s" % (datetime.datetime.now().isoformat(), msg,))
-        #print(msg)
-    pw_logger.debug(msg)
-
-def error(msg, level=1):
-    #if level <= LOG_LEVEL:
-        #print("%s: %s" % (datetime.datetime.now().isoformat(), msg,))
-    pw_logger.error(msg)
-        
-def info(msg):
-    #print("%s: %s" % (datetime.datetime.now().isoformat(), msg,))
-    pw_logger.info(msg)
+from libraries import *
+from libraries.util import *
+from libraries.pwmqtt import *
+from libraries.HTTPWebSocketsHandler import HTTPWebSocketsHandler
     
 cfg = json.load(open("pw-hostconfig.json"))
 
@@ -81,63 +60,77 @@ if cfg.has_key('log_level'):
 info('Number of arguments: %d' % (len(sys.argv),))
 info('Argument List: %s' % (sys.argv,))
 
+#setup mqtt (if mosquitto bindings are found)
+import Queue
+import threading
+#from pwmqttweb import *
+
+mqtt = True
+try:
+    import mosquitto
+except:
+    try:
+        import libraries.mosquitto
+    except:
+        mqtt = False
+        
+qpub = Queue.Queue()
+qsub = Queue.Queue()
+mqtt_t = None
+if  not mqtt:
+    error("No MQTT python binding installed (mosquitto-python)")
+elif cfg.has_key('mqtt_ip') and cfg.has_key('mqtt_port'):
+    #connect to server and start worker thread.
+    mqttclient = Mqtt_client(cfg['mqtt_ip'], cfg['mqtt_port'], qpub, qsub)
+    mqttclient.subscribe("plugwise2py/state/#")
+    mqtt_t = threading.Thread(target=mqttclient.run)
+    mqtt_t.setDaemon(True)
+    mqtt_t.start()
+    info("MQTT thread started")
+    print("MQTT thread started")
+else:
+    error("No MQTT broker and port configured")
+    mqtt = False
+    
+print("MQTT thread started")
+
 if len(sys.argv) > 1:
     port = int(sys.argv[1])
 else:
     port = 8000
-    
-class MyHandler(BaseHTTPRequestHandler):
+
+ 
+class PW2PYwebHandler(HTTPWebSocketsHandler):
     def do_GET(self):
-        try:
-            debug("GET " + self.path)
-            if self.path in ['', '/', '/index']:
-                self.path = '/index.html'
-            #for this sprecific application this entry point:
-            if self.path == '/index.html':
-                self.path = '/pw2py.html'
-            #parse url
-            purl = urlparse.urlparse(self.path)
-            path = purl.path
-            debug("parsed: " + path)
-            if path == '/schedules':
-                #retrieve list of schedules
-                schedules = [os.path.splitext(os.path.basename(x))[0] for x in glob.glob(os.curdir + os.sep + 'schedules/*.json')]
-                #print schedules
-                self.send_response(200)
-                self.send_header('Content-type', 'application/json')
-                self.end_headers()
-                self.wfile.write(json.dumps(schedules))
-                return
-            #only allow certain file types to be retrieved
-            elif ((path.startswith('/schedules/') and path.endswith('.json')) or
-                    any(path.endswith(x) for x in ('.html','.js','.css','.jpg','.gif', '.svg', '.ttf', '.woff', '.txt','.map'))):
-                f = open(os.curdir + os.sep + path) 
-                self.send_response(200)
-                self.send_header('Content-type', mimetypes.guess_type(path)[0])
-                self.end_headers()
-                self.wfile.write(f.read())
-                f.close()
-                return
-            else:
-                self.send_error(404,'Page not found')
-        except IOError:
-            self.send_error(404,'File Not Found: %s' % self.path)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        debug("GET " + self.path)
+        if self.path in ['', '/', '/index']:
+            self.path = '/index.html'
+        #for this specific application this entry point:
+        if self.path == '/index.html':
+            self.path = '/pw2py.html'
+        #parse url
+        purl = urlparse.urlparse(self.path)
+        path = purl.path
+        debug("parsed: " + path)
+        if path == '/schedules':
+            #retrieve list of schedules
+            schedules = [os.path.splitext(os.path.basename(x))[0] for x in glob.glob(os.curdir + os.sep + 'schedules/*.json')]
+            #print schedules
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(schedules))
+            return
+        
+        #websocket request?
+        #websocket url needs to have extension .ws. No test header required
+        #elif self.headers.get("Upgrade", None) == "websocket":
+        #
+        #only allow certain file types to be retrieved
+        elif any(path.endswith(x) for x in ('.ws','.html','.js','.css','.png','.jpg','.gif', '.svg', '.ttf', '.woff', '.txt','.map','.json')):
+            HTTPWebSocketsHandler.do_GET(self)
+        else:
+            self.send_error(404,'Plugwise-2-py-web Page not found')
 
 
     def do_POST(self):
@@ -156,11 +149,9 @@ class MyHandler(BaseHTTPRequestHandler):
         debug("%s POST: Content-type %s" % (clienttype, ctype))
 
         if ((ctype == 'application/x-www-form-urlencoded') or (ctype == 'application/json')):
-            if (path.startswith('/schedules/') and path.endswith('.json')):
-
-
-                #Write a schedule JSON file
-                debug("POST write a schedule JSON file")
+            if (path.startswith('/schedules/') and path.endswith('.json')) or path == '/pw-control.json':
+                #Write a config or schedule JSON file
+                debug("POST write a config schedule JSON file")
                 length = int(self.headers.getheader('content-length'))
                 raw = self.rfile.read(length)
                 #print raw
@@ -216,7 +207,20 @@ class MyHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(json.dumps({ "result": "ok"}))
                 return
- 
+            elif path == '/mqtt/':
+                length = int(self.headers.getheader('content-length'))
+                raw = self.rfile.read(length)
+                data = json.loads(raw)
+                info("POST mqtt message: %s" % data)
+                topic = str(data['topic'])
+                msg = json.dumps(data['payload'])
+                qpub.put((topic, msg))
+                self.send_response(200, "ok")
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({ "result": "ok"}))
+                return
+
         
         info("POST unhandled. Send 404.")
         self.send_response(404, "unsupported POST")
@@ -224,15 +228,64 @@ class MyHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps({ "error": "only accepting application/json or application/x-www-form-urlencoded" }))
         return
-                    
+ 
+    def on_ws_message(self, message):
+        if message is None:
+            message = ''
+        # # echo message back to client
+        # self.send_message(str(message))
+        self.log_message('websocket received "%s"',str(message))
+        try:
+            data = json.loads(message)
+            topic = str(data['topic'])
+            payload = json.dumps(data['payload'])
+            qpub.put((topic, payload))
+        except Exception as err:
+            print("Error parsing incoming websocket message: %s", err)
+
+    def on_ws_connected(self):
+        self.log_message('%s','websocket connected')
+        self.t = threading.Thread(target=self.process_mqtt)
+        self.t.daemon = True
+        self.t.start()
+
+    def on_ws_closed(self):
+        self.log_message('%s','websocket closed')
+        
+    def process_mqtt(self):
+        while self.handshake_done:
+            while not qsub.empty():
+                rcv = qsub.get()
+                topic = rcv[0]
+                payl = rcv[1]
+                info("process_mqtt_commands: %s %s" % (topic, payl)) 
+                if self.handshake_done:
+                    self.send_message(payl)
+            time.sleep(0.5)
+    
+    # def handle(self):
+        # """Handle multiple requests if necessary."""
+        # self.close_connection = 1
+
+        # self.handle_one_request()
+        # while not self.close_connection:
+            # self.handle_one_request()
+ 
+class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+    """Handle requests in a separate thread."""
+ 
 def main():
     try:
-        server = HTTPServer(('', port), MyHandler)
+        server = ThreadedHTTPServer(('', port), PW2PYwebHandler)
+        server.daemon_threads = True
         info('started httpserver at port %d' % (port,))
+        #process_mqtt_commands()
         server.serve_forever()
     except KeyboardInterrupt:
-        error('^C received, shutting down server')
-        server.socket.close()
+        print('^C received, shutting down server')
+        #server.socket.close()
+        server.shutdown()
+        print "exit after server.shutdown()"
 
 if __name__ == '__main__':
     main()

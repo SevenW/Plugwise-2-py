@@ -1,0 +1,217 @@
+<!doctype html>
+<html ng-app="schedules">
+<head>
+  <!--
+  Loading Handsontable (full distribution that includes all dependencies apart from jQuery)
+  -->
+  <script src="/components/hot/lib/jquery.min.js"></script>
+  <script src="/components/hot/dist/jquery.handsontable.full.js"></script>
+  <link rel="stylesheet" media="screen" href="/components/hot/dist/jquery.handsontable.full.css">
+
+  <!-- 
+  Loading Angular, Bootstrap 3, Font Awesome, Bootstrap-UI (angular)
+  -->
+  <script src="/components/angularjs/angular.min.js"></script>
+  <link href="/components/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/components/font-awesome/css/font-awesome.min.css" rel="stylesheet">
+  <script src="/components/ui-bootstrap/ui-bootstrap-tpls-0.11.0.min.js"></script>
+  
+  <!-- 
+  Loading Application scripts
+  -->
+  <script src="/components/cfg-pw2py.js"></script> 
+  <script src="/components/modal.js"></script> 
+  <link href="/components/cfg-pw2py.css" rel="stylesheet" type="text/css" />
+
+  <meta charset='utf-8'>
+  <title>Plugwise-2.py schedule editor</title>
+</head>
+<body>
+<div ng-controller="mainCtrl" id=angjscontainer>
+<tabset type="pills">
+<tab class="col-sm-2" heading="Circles" active="tabs[0]">
+</br>
+<div class="row">
+<form name="circleList">
+
+  <div class="col-sm-2">
+    <div ng-class="{'input-group':mctrl.addMAC, 'has-error':!circleList.$valid}">
+	  <input id="add" type="text" class="form-control" placeholder="new circle mac ..." ng-model="mctrl.addMAC" ng-pattern="/^[a-zA-Z0-9_\-\.]+$/"ng-change="addTemp()" disabled/>
+	    <div class="error-container" ng-show="circleList.$dirty && circleList.$invalid">
+    <small><p class="text-danger">Schedule names: A-Z, a-z, 0-9, _, -, .</p></small>
+</div>
+	  <span class="input-group-btn">
+		<input type="submit" class="btn btn-primary" ng-click="addCircle()" ng-show="mctrl.addMAC" ng-disabled="!circleList.$valid" value="+ add"/>
+	  </span>
+	</div>
+
+  </div>
+  <div class="col-sm-2">
+    <div class="input-group">
+		<span class="input-group-addon">
+		  <i class="glyphicon glyphicon-search"></i>
+		</span>
+		<input type="text" class="form-control" placeholder="Search" ng-model="search"/>
+		<span class="input-group-btn" >
+		  <button type="submit" class="btn btn-inverse" ng-click="search=''" ng-show="search" >
+		    <span class="glyphicon glyphicon-remove"></span>
+		  </button>
+		</span>
+	  </div>
+	</div>
+	</form>
+  </div>
+ 
+ <table  class="table table-striped">
+    <thead>
+        <tr>
+            <th class="col-sm-1">#</th>
+            <th class="col-sm-2">MAC</th>
+            <th class="col-sm-2">Name</th>
+            <th class="col-sm-2">Location</th>
+            <th class="col-sm-2">Category</th>
+            <th class="col-sm-1">Edit</th>
+            <th class="col-sm-1">Remove</th>
+            <!-- <th class="col-sm-5">blank</th> -->
+        </tr>
+    </thead>
+	<tbody>
+    <tr ng-repeat="circle in circles | filter : search"  ng-class="{'muted':isTemp($index)}">
+      <td>{{$index+1}}</td>
+      <td>{{circle.mac}}</td>
+      <td>{{circle.name}}</td>
+      <td>{{circle.location}}</td>
+      <td>{{circle.category}}</td>
+      <td>
+        <div>
+        <button class="btn btn-primary btn-mini" ng-click="editCircle(circle)" ng-hide="isTemp($index)"><i class="glyphicon glyphicon-pencil"></i></button>
+		</div>
+      </td>
+      <td>
+        <div ng-controller="ConfirmDeleteCtrl">
+		<button class="btn btn-danger btn-mini" ng-click="deleteCircle(circle)" ng-disabled="true" ng-hide="isTemp($index)"><i class="glyphicon glyphicon-trash"></i></button>
+		</div>
+      </td>
+    </tr>
+	</tbody>
+  </table>
+  </tab>
+  
+<tab class="col-sm-2" heading="Schedules" active="tabs[1]">
+</br>
+<div class="row">
+<form name="scheduleList">
+
+  <div class="col-sm-2">
+    <div ng-class="{'input-group':mctrl.addName, 'has-error':!scheduleList.$valid}">
+	  <input id="add" type="text" class="form-control" placeholder="new schedule name ..." ng-model="mctrl.addName" ng-pattern="/^[a-zA-Z0-9_\-\.]+$/"ng-change="addTemp()"/>
+	    <div class="error-container" ng-show="scheduleList.$dirty && scheduleList.$invalid">
+    <small><p class="text-danger">Schedule names: A-Z, a-z, 0-9, _, -, .</p></small>
+</div>
+	  <span class="input-group-btn">
+		<input type="submit" class="btn btn-primary" ng-click="addRow()" ng-show="mctrl.addName" ng-disabled="!scheduleList.$valid" value="+ add"/>
+	  </span>
+	</div>
+
+  </div>
+  <div class="col-sm-2">
+    <div class="input-group">
+		<span class="input-group-addon">
+		  <i class="glyphicon glyphicon-search"></i>
+		</span>
+		<input type="text" class="form-control" placeholder="Search" ng-model="search"/>
+		<span class="input-group-btn" >
+		  <button type="submit" class="btn btn-inverse" ng-click="search=''" ng-show="search" >
+		    <span class="glyphicon glyphicon-remove"></span>
+		  </button>
+		</span>
+	  </div>
+	</div>
+	</form>
+  </div>
+ 
+ <table  class="table table-striped">
+    <thead>
+        <tr>
+            <th class="col-sm-1">#</th>
+            <th class="col-sm-4">name</th>
+            <th class="col-sm-1">Edit</th>
+            <th class="col-sm-1">Remove</th>
+            <!-- <th class="col-sm-5">blank</th> -->
+        </tr>
+    </thead>
+	<tbody>
+    <tr ng-repeat="row in rows | filter : search"  ng-class="{'muted':isTemp($index)}">
+      <td>{{$index+1}}</td>
+      <td>{{row}}</td>
+      <td>
+        <button class="btn btn-primary btn-mini" ng-click="editRow(row)" ng-hide="isTemp($index)"><i class="glyphicon glyphicon-pencil"></i></button>
+      </td>
+      <td>
+        <div ng-controller="ConfirmDeleteCtrl">
+		<button class="btn btn-danger btn-mini" ng-click="deleteSchedule(row)" ng-hide="isTemp($index)"><i class="glyphicon glyphicon-trash"></i></button>
+		</div>
+      </td>
+    </tr>
+	</tbody>
+  </table>
+  </tab>
+  
+  <tab class="col-sm-2" heading="Schedule Editor" active="tabs[2]">
+    <form class="form-horizontal">
+		<div class="form-group">
+			<label class="control-label col-sm-1">Schedule</label>
+			<p class="form-control-static col-sm-3">{{curSched}}</p>
+		</div>
+		<div class="form-group">
+			<label class="control-label col-sm-1">Description</label>
+			<div class="col-sm-3">
+				<input type="text" class="form-control" placeholder="description" ng-model="mctrl.description" ng-change="state.changed=true"></input>
+			</div>
+		</div>
+<!--	
+    <div class="row">
+-->	  
+	  <div class="form-group">
+	  <div class="col-sm-offset-1 col-sm-1">
+	    <button type="button" class="btn btn-block" ng-class="{'btn-primary': !state.changed, 'btn-warning': state.changed}" ng-click="saveSchedule()">
+          <i class="fa fa-check-square-o"></i>
+        </button>
+	  </div>
+	  <div class="col-sm-1">
+	    <button type="button" class="btn btn-primary btn-block" ng-click="cancelSchedule()">
+          <i class="fa fa-minus-square-o"></i>
+        </button>
+	  </div>
+	  <div class="col-sm-1">
+	    <button type="button" class="btn btn-primary btn-block" ng-click="toggleWidth()">
+          <i class="fa fa-table"></i>
+        </button>
+	  </div>
+	</div>
+		</form>
+
+	<handsontable schedule="mctrl.schedule" alrt="alrt" unsaved="state.changed" fit="state.fit" valchanged="setChanged()"></handsontable>
+	</hr>
+	<alert class="col-sm-6" type="{{alrt.type}}" >{{alrt.msg}}</alert>
+
+  </tab>
+  
+  
+  
+  <tab class="col-sm-2" heading="Future PW"  active="tabs[3]">
+  </br><p>Expect some future extensions of the Plugwise-2.py web applicaiton.</p>
+  <p>Change log-level</p>
+  <p>Enable communication logging</p>
+  <p>Enable changes of static ocnfiguration, requiring restart of Plugwise server</p>
+  <p>Configure MQTT, etc...</p>
+  
+  <div class="footer-text">Plugwise-2-py schedule editor &copy; 2014 sevenwatt.com.<br>
+    Licensed under the The MIT License.
+  </div>
+</div>
+</tab>
+</tabset>
+</div> <!-- end angular section -->
+</body>
+</html>

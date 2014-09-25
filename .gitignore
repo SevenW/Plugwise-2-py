@@ -12,4 +12,4 @@ plugwise/mosquitto.py
 ez_setup.py
 *.pyc
 *.log
-
+*.out

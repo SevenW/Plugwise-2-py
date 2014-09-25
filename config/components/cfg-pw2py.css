@@ -14,8 +14,6 @@ body{
     background-color:#fff;
     border: 1px solid #d4d4d4;
     /*height:300px;*/
-	/*min-width: 280px;*/
-	/*width: 280px;*/
     margin-bottom: 20px;
     /*position: relative;*/
     border-radius: 10px 10px 10px 10px;
@@ -23,10 +21,9 @@ body{
 }
 
 .cardHeader {
-	background-color: #428bca;
-	/*background-color: #5bc0de;*/
+	background-color: #5bc0de;
 	/*background-color:#027FF4;*/
-    font-size:16pt;
+    font-size:14pt;
     color:white;
     padding:5px;
     /*width:100%;*/
@@ -77,31 +74,10 @@ body{
 .cardReading {
     font-size: 22pt;
 	font-weight:bold;
-	white-space: nowrap;
 }
 .cardInfo {
-    font-size: 12pt;
+    font-size: 8pt;
 	color: #bbb;
-	white-space: nowrap;
-	float: right;
-	margin-right: -10px;
-}
-
-.cardBig {
-    font-size: 30pt;
-}
-
-.cardBigBig {
-    font-size: 40pt;
-}
-
-.cardOn {
-    color: #E6B800;
-    /*color: #FFCC00;*/
-}
-
-.cardOff {
-    color: #bbb;
 }
 
 .production {
