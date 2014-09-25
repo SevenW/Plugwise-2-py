@@ -2,6 +2,7 @@ Plugwise-2-py
 =============
 
 #Key features:
+- Web-interface to switch, configure and edit schedules and stand-by killer
 - MQTT interface for control and log meter readings.
 - Log every 10-seconds in monitoring mode.
 - Read and log Circle metering buffers.
@@ -18,13 +19,17 @@ Plugwise-2.py is a program is a logger of recorded meterings by plugwise.
 It also serves as a controller of the switches, and it can be used to upload
 switching/standby schedules to the circles.
 
-The interface to control is a file interface. There are four configuration files:
+The interface to control is a file interface. There are three configuration files:
 - pw-hostconfig.json: some host/server specific settings.
 - pw-conf.json: intended as static configuration of the plugs.
 - pw-control.json: dynamic configuration.
-- pw-schedules.json: contains one or more week-schedules to switch the plugs on and off.
 
-Changes to pw-control.json and pw-schedules.json are automatically picked up by Plugwise-2.py and applied.
+Switching / stand-by killer schedules are defines as json files in the schedules folder
+- schedules/*.json: contains a week-schedule to switch the plugs on and off.
+
+Changes to pw-control.json and schedules/*.json are automatically picked up by Plugwise-2.py and applied.
+
+pw-control.json and schedules/*.json can be edited with the web applicaiton (see below)
 
 In the dynamic configuration:
 - logging of the in-circle integrated values can be enabled (usually the one-value-per-hour loggings.
@@ -88,6 +93,37 @@ the log level can be programmed in pw-control.json. Changes are picked up latest
 
 log_comm results in logging to  pw-communications.log, in the log folder specified through log_path in pw-hostconfig.json
 
+Web interface
+-------------
+Plugwise-2-py can be operated through a web interfaces. The packages comes with its own dedicated webserver also written in python. It makes use of websockets for efficient and unsolicited communication.
+##setup
+
+```#assume current directory is Plugwise-2-py main directory
+cd config
+nohup python Plugwise-2-web.py >>pwwebout.log&```
+
+The website uses port 8000 by default, and can be changed by an optional parameter:
+```nohup python Plugwise-2-web.py 8001 >>pwwebout.log&```
+
+##use
+###Control (switch and monitor)
+type in browser
+```http://<ip of the server>:8000```
+or
+```http://<ip of the server>:8000/pw2py.html```
+for example:
+```http://localhost:8000/pw2py.html```
+
+###Configure and edit schedules
+(No editing static configuration file supported yet)
+type in browser:
+```http://<ip of the server>:8000/cfg-pw2py.html```
+for example:
+```http://localhost:8000/cfg-pw2py.html```
+
+##require
+The Control web-application requires the MQTT connection to be operational. The configuration application can work without MQTT.
+
 MQTT
 ----
 ##power readings
@@ -102,7 +138,7 @@ Autonomous messages are published when monitoring = "yes" and when savelog = "ye
 
 The readings of the Circle buffers are published as:
 
-`plugwise2py/state/energy/000D6F0001Annnnn {"typ":"pwenergy","ts":1405450200,"mac":"000D6F00019E1A1E","power":214.2069,"energy":35.7012,"interval":10}`
+`plugwise2py/state/energy/000D6F0001Annnnn {"typ":"pwenergy","ts":1405450200,"mac":"000D6F0001nnnnnn","power":214.2069,"energy":35.7012,"interval":10}`
 
 ###On request
 From applications like openhab, a power reading can be requested when needed, or for example scheduled by a cron job. The request will return a full circle state including the short term (8 seconds) integrated power value of the circle. Requests:
