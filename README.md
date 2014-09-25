@@ -46,7 +46,7 @@ Setup
 installation:
 
 ```
-wget https://bitbucket.org/pypa/setuptools/raw/bootstrap/ez_setup.py -O - | sudo python```
+wget https://bitbucket.org/pypa/setuptools/raw/bootstrap/ez_setup.py -O - | sudo python
 
 git clone https://github.com/SevenW/Plugwise-2-py.git
 cd Plugwise-2-py
@@ -98,7 +98,8 @@ Web interface
 Plugwise-2-py can be operated through a web interfaces. The packages comes with its own dedicated webserver also written in python. It makes use of websockets for efficient and unsolicited communication.
 ##setup
 
-```#assume current directory is Plugwise-2-py main directory
+```
+#assume current directory is Plugwise-2-py main directory
 cd config
 nohup python Plugwise-2-web.py >>pwwebout.log&```
 
@@ -108,18 +109,27 @@ The website uses port 8000 by default, and can be changed by an optional paramet
 ##use
 ###Control (switch and monitor)
 type in browser
+
 ```http://<ip of the server>:8000```
+
 or
+
 ```http://<ip of the server>:8000/pw2py.html```
+
 for example:
+
 ```http://localhost:8000/pw2py.html```
 
 ###Configure and edit schedules
 (No editing static configuration file supported yet)
 type in browser:
+
 ```http://<ip of the server>:8000/cfg-pw2py.html```
+
 for example:
+
 ```http://localhost:8000/cfg-pw2py.html```
+
 
 ##require
 The Control web-application requires the MQTT connection to be operational. The configuration application can work without MQTT.
