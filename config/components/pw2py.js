@@ -45,10 +45,6 @@ app.controller("pw2pyCtrl", function pw2pyCtrl($scope, $http, WS){
 							circle.icon = "fa-plug"
 						}
 						
-						//TESTCODE
-						circle.alwayson = !(circle.name == 'circle+');
-						
-						
  						$scope.circles.push(circle);
 						console.log(dynconf);
 						console.log(statconf);
