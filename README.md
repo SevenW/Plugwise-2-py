@@ -101,34 +101,36 @@ Plugwise-2-py can be operated through a web interfaces. The packages comes with 
 ```
 #assume current directory is Plugwise-2-py main directory
 cd config
-nohup python Plugwise-2-web.py >>pwwebout.log&```
+nohup python Plugwise-2-web.py >>pwwebout.log&
+```
 
 The website uses port 8000 by default, and can be changed by an optional parameter:
-```nohup python Plugwise-2-web.py 8001 >>pwwebout.log&```
+
+`nohup python Plugwise-2-web.py 8001 >>pwwebout.log&`
 
 ##use
 ###Control (switch and monitor)
 type in browser
 
-```http://<ip of the server>:8000```
+`http://<ip of the server>:8000`
 
 or
 
-```http://<ip of the server>:8000/pw2py.html```
+`http://<ip of the server>:8000/pw2py.html`
 
 for example:
 
-```http://localhost:8000/pw2py.html```
+`http://localhost:8000/pw2py.html`
 
 ###Configure and edit schedules
 (No editing static configuration file supported yet)
 type in browser:
 
-```http://<ip of the server>:8000/cfg-pw2py.html```
+`http://<ip of the server>:8000/cfg-pw2py.html`
 
 for example:
 
-```http://localhost:8000/cfg-pw2py.html```
+`http://localhost:8000/cfg-pw2py.html`
 
 
 ##require
