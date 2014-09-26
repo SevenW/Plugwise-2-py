@@ -45,7 +45,7 @@ Setup
 -----
 installation:
 
-```
+```shell
 wget https://bitbucket.org/pypa/setuptools/raw/bootstrap/ez_setup.py -O - | sudo python
 
 git clone https://github.com/SevenW/Plugwise-2-py.git
@@ -98,7 +98,7 @@ Web interface
 Plugwise-2-py can be operated through a web interfaces. The packages comes with its own dedicated webserver also written in python. It makes use of websockets for efficient and unsolicited communication.
 ##setup
 
-```
+```shell
 #assume current directory is Plugwise-2-py main directory
 cd config
 nohup python Plugwise-2-web.py >>pwwebout.log&
