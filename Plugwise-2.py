@@ -337,11 +337,11 @@ class PWControl(object):
                     if sched != c.schedule._watt:
                         info("apply_schedule_changes: schedule changed. Update in circle %s - %s" % (c.attr['name'], c.schedule.name))
                         #schedule changed so upload to this circle
-                        c.define_schedule(c.schedule.name, sched, time.daylight)
+                        c.define_schedule(c.schedule.name, sched, time.localtime().tm_isdst)
                         try:
                             sched_state = c.schedule_state
                             c.schedule_off()
-                            c.load_schedule(time.daylight)
+                            c.load_schedule(time.localtime().tm_isdst)
                             #update scheduleCRC
                             c.get_clock()
                             if sched_state == 'on':
@@ -463,15 +463,15 @@ class PWControl(object):
                     info('circle mac: %s needs schedule to be defined' % (mac,))
                     #print('circle mac: %s needs schedule to be defined' % (mac,))
                     #define schedule object for circle
-                    c.define_schedule(schedname, sched, time.daylight)
+                    c.define_schedule(schedname, sched, time.localtime().tm_isdst)
                     
                 #Only upload when mismatch in CRC
                 debug("apply_control_to_circle: compare CRC's: %d %d" %(c.schedule.CRC, c.scheduleCRC))
-                if  c.schedule.CRC != c.scheduleCRC or c.schedule.dst != time.daylight:
+                if  c.schedule.CRC != c.scheduleCRC or c.schedule.dst != time.localtime().tm_isdst:
                     info('circle mac: %s needs schedule to be uploaded' % (mac,))
                     try:
                         c.schedule_off()
-                        c.load_schedule(time.daylight)
+                        c.load_schedule(time.localtime().tm_isdst)
                         #update scheduleCRC
                         c.get_clock()
                     except (ValueError, TimeoutException, SerialException) as reason:
@@ -1155,7 +1155,7 @@ class PWControl(object):
         day = now.day
         hour = now.hour
         minute = now.minute
-        dst = time.daylight
+        dst = time.localtime().tm_isdst
 
         self.sync_time()
         self.dump_status()
@@ -1209,7 +1209,7 @@ class PWControl(object):
             locnow = datetime.utcnow()-timedelta(seconds=time.timezone)
             now = locnow
             
-            dst = time.daylight
+            dst = time.localtime().tm_isdst
             day = now.day
             hour = now.hour
             minute = now.minute
@@ -1261,7 +1261,7 @@ class PWControl(object):
             
             #update schedules after change in DST. Update one every ten seconds
             for c in self.circles:
-                if c.online and c.schedule != None and c.schedule.dst != time.daylight:
+                if c.online and c.schedule != None and c.schedule.dst != time.localtime().tm_isdst:
                     info("Circle '%s' schedule shift due to DST changed." % (c.attr['name'],))
                     idx=self.controlsbymac[c.mac]
                     self.apply_control_to_circle(self.controls[idx], c.mac, force=True)
