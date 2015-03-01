@@ -1306,4 +1306,4 @@ try:
     main.run()
 except:
     close_logcomm()
-    raise
+    raise 
