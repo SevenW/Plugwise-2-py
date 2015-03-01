@@ -9,7 +9,7 @@ import os
 class Mqtt_client(object):
     """Main program class
     """
-    def __init__(self, broker, port, qpub, qsub, name="pwmqtt"):
+    def __init__(self, broker, port, qpub, qsub, name="pwmqtt", user = None, password = None):
         """
         ...
         """
@@ -21,6 +21,9 @@ class Mqtt_client(object):
         self.rc = -1
         self.mqttc = None
         self.name = name+str(os.getpid())
+        self.user = user
+        self.password = password
+        
         self.connect()
         debug("MQTT init done")
         
@@ -34,6 +37,11 @@ class Mqtt_client(object):
         self.mqttc.on_disconnect = self.on_disconnect
         self.mqttc.on_publish = self.on_publish
         self.mqttc.on_subscribe = self.on_subscribe
+        
+        #Set the username and password if any
+        if self.user != None:
+    	    self.mqttc.username_pw_set(self.user,self.password)
+        
         return self._connect()
 
     def _connect(self):
