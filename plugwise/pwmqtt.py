@@ -40,6 +40,7 @@ class Mqtt_client(object):
         self.mqttc.on_subscribe = self.on_subscribe
         
         print "Connecting with username: %s and password: %s" % (self.user,self.password)
+        debug("Connecting with username: %s and password: %s" % (self.user,self.password))
         
         #Set the username and password if any
         if self.user != None:
