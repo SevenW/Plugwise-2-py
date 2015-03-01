@@ -79,6 +79,15 @@ qsub = Queue.Queue()
 mqtt_t = None
 if  not mqtt:
     error("No MQTT python binding installed (mosquitto-python)")
+elif cfg.has_key('mqtt_ip') and cfg.has_key('mqtt_port') and cfg.has_key('mqtt_user') and cfg.has_key('mqtt_password'):
+    #connect to server and start worker thread.
+    mqttclient = Mqtt_client(cfg['mqtt_ip'], cfg['mqtt_port'], qpub, qsub,cfg['mqtt_user'],cfg['mqtt_password'])
+    mqttclient.subscribe("plugwise2py/state/#")
+    mqtt_t = threading.Thread(target=mqttclient.run)
+    mqtt_t.setDaemon(True)
+    mqtt_t.start()
+    info("MQTT thread started")
+    print("MQTT thread started")
 elif cfg.has_key('mqtt_ip') and cfg.has_key('mqtt_port'):
     #connect to server and start worker thread.
     mqttclient = Mqtt_client(cfg['mqtt_ip'], cfg['mqtt_port'], qpub, qsub)
