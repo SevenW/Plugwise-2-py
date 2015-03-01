@@ -39,10 +39,11 @@ class Mqtt_client(object):
         self.mqttc.on_publish = self.on_publish
         self.mqttc.on_subscribe = self.on_subscribe
         
+        print "Connecting with username: %s and password: %s" % (self.user,self.password)
+        
         #Set the username and password if any
         if self.user != None:
     	    self.mqttc.username_pw_set(self.user,self.password)
-    	    print "Connected with user name %s and password %s" % (self.user,self.password)
     			
         return self._connect()
 
