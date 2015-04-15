@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (C) 2012,2013,2014 Seven Watt <info@sevenwatt.com>
+# Copyright (C) 2012,2013,2014,2015 Seven Watt <info@sevenwatt.com>
 # <http://www.sevenwatt.com>
 #
 # This file is part of Plugwise-2-py.
@@ -161,7 +161,8 @@ class PWControl(object):
             info("adding circle: %s" % (self.circles[-1].attr['name'],))
         
         #retrieve last log addresses from persistent storage
-        with open(self.lastlogfname, 'r+') as f:
+        with open(self.lastlogfname, 'a+') as f:
+            f.seek(0)
             for line in f:
                 parts = line.split(',')
                 mac, logaddr = parts[0:2]
