@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (C) 2014 Seven Watt <info@sevenwatt.com>
+# Copyright (C) 2014, 2015 Seven Watt <info@sevenwatt.com>
 # <http://www.sevenwatt.com>
 #
 # This file is part of Plugwise-2.
@@ -35,6 +35,8 @@ import threading
 from SocketServer import ThreadingMixIn
 from BaseHTTPServer import HTTPServer
 from SimpleHTTPServer import SimpleHTTPRequestHandler
+import ssl
+from base64 import b64encode
 
 from libraries import *
 from libraries.util import *
@@ -98,7 +100,14 @@ if len(sys.argv) > 1:
     port = int(sys.argv[1])
 else:
     port = 8000
-
+if len(sys.argv) > 2:
+    secure = str(sys.argv[2]).lower()=="secure"
+else:
+    secure = False
+if len(sys.argv) > 3:
+    credentials = str(sys.argv[3])
+else:
+    credentials = ""
  
 class PW2PYwebHandler(HTTPWebSocketsHandler):
     def do_GET(self):
@@ -278,7 +287,13 @@ def main():
     try:
         server = ThreadedHTTPServer(('', port), PW2PYwebHandler)
         server.daemon_threads = True
-        info('started httpserver at port %d' % (port,))
+        server.auth = b64encode(credentials)
+        if secure:
+            #ssl_version=ssl.PROTOCOL_TLSv1 avoids POODLE vulnerability
+            server.socket = ssl.wrap_socket (server.socket, certfile='./server.pem', server_side=True, ssl_version=ssl.PROTOCOL_TLSv1)
+            info('started secure https server at port %d' % (port,))
+        else: 
+            info('started http server at port %d' % (port,))
         #process_mqtt_commands()
         server.serve_forever()
     except KeyboardInterrupt:

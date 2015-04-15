@@ -229,7 +229,12 @@ app.factory('WS', function() {
  
     //var host = window.location.href.split("/")[2];
     var host = window.location.host;
-	var ws = new WebSocket("ws://"+host+"/socket.ws");
+	var ws;
+	if (window.location.protocol == 'https:') {
+		ws = new WebSocket("wss://"+host+"/socket.ws");
+	} else {
+		ws = new WebSocket("ws://"+host+"/socket.ws");
+	}
  
     ws.onopen = function() {
       service.callback("Succeeded to open a connection");

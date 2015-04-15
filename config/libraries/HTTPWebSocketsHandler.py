@@ -1,7 +1,7 @@
 '''
 The MIT License (MIT)
 
-Copyright (C) 2014 Seven Watt <info@sevenwatt.com>
+Copyright (C) 2014, 2015 Seven Watt <info@sevenwatt.com>
 <http://www.sevenwatt.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
@@ -51,7 +51,18 @@ class HTTPWebSocketsHandler(SimpleHTTPRequestHandler):
             # # print("handle_one_request() socket timed out: %s", e)
             # pass
                           
+    def checkAuthentication(self):
+        auth = self.headers.get('Authorization')
+        if auth != "Basic %s" % self.server.auth:
+            self.send_response(401)
+            self.send_header("WWW-Authenticate", 'Basic realm="webdev"')
+            self.end_headers();
+            return False
+        return True
+
     def do_GET(self):
+        if self.server.auth and not self.checkAuthentication():
+            return
         if self.headers.get("Upgrade", None) == "websocket":
             self.handshake()
         else:
@@ -127,47 +138,3 @@ class HTTPWebSocketsHandler(SimpleHTTPRequestHandler):
         msg.append(0x88)
         msg.append(0x00)
         self.request.send(msg)
-
-class WSSimpleEcho(HTTPWebSocketsHandler):
-    def on_ws_message(self, message):
-        if message is None:
-            message = ''
-        # echo message back to client
-        self.send_message(str(message))
-        self.log_message('websocket received "%s"',str(message))
-
-    def on_ws_connected(self):
-        self.log_message('%s','websocket connected')
-
-    def on_ws_closed(self):
-        self.log_message('%s','websocket closed')
-
-        
-#main program and imports for standalone purpose       
-import sys
-import threading
-from SocketServer import ThreadingMixIn
-from BaseHTTPServer import HTTPServer
-from SimpleHTTPServer import SimpleHTTPRequestHandler
-
-if len(sys.argv) > 1:
-    port = int(sys.argv[1])
-else:
-    port = 8000
-
-class WSThreadedHTTPServer(ThreadingMixIn, HTTPServer):
-    """Handle requests in a separate thread."""
-    
-def _ws_main():
-    try:
-        #server = WSThreadedHTTPServer(('', port), HTTPWebSocketsHandler)
-        server = WSThreadedHTTPServer(('', port), WSSimpleEcho)
-        server.daemon_threads = True
-        print('started httpserver at port %d' % (port,))
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print('^C received, shutting down server')
-        server.socket.close()
-
-if __name__ == '__main__':
-    _ws_main()        

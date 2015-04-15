@@ -13,3 +13,4 @@ ez_setup.py
 *.pyc
 *.log
 *.out
+*.pem
