@@ -55,7 +55,7 @@ class HTTPWebSocketsHandler(SimpleHTTPRequestHandler):
         auth = self.headers.get('Authorization')
         if auth != "Basic %s" % self.server.auth:
             self.send_response(401)
-            self.send_header("WWW-Authenticate", 'Basic realm="webdev"')
+            self.send_header("WWW-Authenticate", 'Basic realm="Plugwise"')
             self.end_headers();
             return False
         return True
