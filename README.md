@@ -131,7 +131,7 @@ nohup python Plugwise-2-web.py 8000 secure >>pwwebout.log&
 nohup python Plugwise-2-web.py 8002 >>pwwebout.log&
 
 #plain http, default port 8000
-nohup python Plugwise-2-web.py 8002 >>pwwebout.log&
+nohup python Plugwise-2-web.py >>pwwebout.log&
 ```
 
 ##use
