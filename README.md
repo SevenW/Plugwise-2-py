@@ -43,7 +43,6 @@ Besides the new functions for logging and control purposes, there are major impr
 
 Setup
 -----
-installation:
 
 ```shell
 wget https://bootstrap.pypa.io/get-pip.py
@@ -55,14 +54,18 @@ pip install .
 ```
 
 ##Configuration:
-First time install
+*First time install*
+
 Template config files are provided in the `config-default` folder. Those can be copied to the `config` folder. Be careful not to overwrite earlier settings.
 
-```#from Plugwise-2-py folder:
+```shell
+#from Plugwise-2-py folder:
 cp -n config-default/pw-hostconfig.json config/
 cp -n config-default/pw-control.json config/
 cp -n config-default/pw-conf.json config/
 ```
+
+*configuring server and circles*
 
 In pw-hostconfig.json edit tmp_path, permanent_path, log_path and serial
 
