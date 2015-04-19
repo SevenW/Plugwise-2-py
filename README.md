@@ -46,14 +46,23 @@ Setup
 installation:
 
 ```shell
-wget https://bitbucket.org/pypa/setuptools/raw/bootstrap/ez_setup.py -O - | sudo python
+wget https://bootstrap.pypa.io/get-pip.py
+python get-pip.py
 
 git clone https://github.com/SevenW/Plugwise-2-py.git
 cd Plugwise-2-py
-sudo python setup.py install
+pip install .
 ```
 
-##config:
+##Configuration:
+First time install
+Template config files are provided in the `config-default` folder. Those can be copied to the `config` folder. Be careful not to overwrite earlier settings.
+
+```#from Plugwise-2-py folder:
+cp -n config-default/pw-hostconfig.json config/
+cp -n config-default/pw-control.json config/
+cp -n config-default/pw-conf.json config/
+```
 
 In pw-hostconfig.json edit tmp_path, permanent_path, log_path and serial
 
@@ -108,6 +117,12 @@ The website uses port 8000 by default, and can be changed by an optional paramet
 
 `nohup python Plugwise-2-web.py 8001 >>pwwebout.log&`
 
+The use SSL (https) and a password provide more optional paramters:
+
+`nohup python Plugwise-2-web.py 8000 secure user:password >>pwwebout.log&`
+
+change user and password to user credentials of your liking.
+
 ##use
 ###Control (switch and monitor)
 type in browser
@@ -121,6 +136,10 @@ or
 for example:
 
 `http://localhost:8000/pw2py.html`
+
+in case of SSL/secure: use https//:
+
+`https://localhost:8000/pw2py.html`
 
 ###Configure and edit schedules
 (No editing static configuration file supported yet)
