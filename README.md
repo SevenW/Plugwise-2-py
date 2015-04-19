@@ -46,14 +46,14 @@ Setup
 
 ```shell
 wget https://bootstrap.pypa.io/get-pip.py
-python get-pip.py
+sudo python get-pip.py
 
 git clone https://github.com/SevenW/Plugwise-2-py.git
 cd Plugwise-2-py
-pip install .
+sudo pip install .
 ```
 
-##Configuration:
+##configuration:
 *First time install*
 
 Template config files are provided in the `config-default` folder. Those can be copied to the `config` folder. Be careful not to overwrite earlier settings.
