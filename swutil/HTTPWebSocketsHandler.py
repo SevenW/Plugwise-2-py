@@ -41,15 +41,26 @@ class HTTPWebSocketsHandler(SimpleHTTPRequestHandler):
         self.handshake_done = False
                 
     def handle_one_request(self):
-        #try:
+        try:
             if self.handshake_done:
-                self.read_next_message()
-                #a read or a write timed out.  Discard this connection
+                try:
+                    self.read_next_message()
+                except err:
+                    print err
+                    #websocket content error, time-out or disconnect.
+                    #Close the websocket
+                    try: 
+                        self.send_close()
+                    except err:
+                        print err
+                    self.handshake_done = False
+                    self.connection_close = 1
+                    self.on_ws_closed()                    
             else:
                 SimpleHTTPRequestHandler.handle_one_request(self)
-        # except socket.timeout, e:
-            # # print("handle_one_request() socket timed out: %s", e)
-            # pass
+        except socket.timeout, e:
+            print("handle_one_request() socket timed out: %s", e)
+            pass
                           
     def checkAuthentication(self):
         auth = self.headers.get('Authorization')
