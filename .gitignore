@@ -6,8 +6,10 @@ my_*
 /dist
 /build
 /plugwise2py.egg-info
+/nongit
 
 #misc
+config/*.json
 plugwise/mosquitto.py
 ez_setup.py
 *.pyc

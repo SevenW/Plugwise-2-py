@@ -1,12 +1,1 @@
-{"dynamic": [
-{"mac": "000D6F0001000000", "switch_state": "on", "name": "circle+", "schedule_state": "off", "schedule": "", "savelog": "no", "monitor": "no"},
-{"mac": "000D6F0001000001", "switch_state": "on", "name": "circle1", "schedule_state": "off", "schedule": "winter", "savelog": "yes", "monitor": "no"},
-{"mac": "000D6F0001000002", "switch_state": "on", "name": "circle2", "schedule_state": "off", "schedule": "", "savelog": "yes", "monitor": "no"},
-{"mac": "000D6F0001000003", "switch_state": "on", "name": "solar-1", "schedule_state": "off", "schedule": "", "savelog": "yes", "monitor": "yes"},
-{"mac": "000D6F0001000004", "switch_state": "on", "name": "circle4", "schedule_state": "off", "schedule": "__PW2PY__test-alternate", "savelog": "yes", "monitor": "no"},
-{"mac": "000D6F0001000005", "switch_state": "on", "name": "circle5", "schedule_state": "off", "schedule": "", "savelog": "yes", "monitor": "no"},
-{"mac": "000D6F0001000006", "switch_state": "on", "name": "solar-2", "schedule_state": "off", "schedule": "", "savelog": "yes", "monitor": "yes"},
-{"mac": "000D6F0001000007", "switch_state": "on", "name": "nas", "schedule_state": "off", "schedule": "", "savelog": "yes", "monitor": "yes"}
-], 
-"log_level": "info", 
-"log_comm": "no"}
+{"log_comm": "no", "log_level": "info", "dynamic": [{"switch_state": "on", "monitor": "no", "schedule": "__PW2PY__test-alternate", "schedule_state": "off", "mac": "000D6F0001A59F7D", "savelog": "no", "name": "circle+"}, {"switch_state": "on", "monitor": "no", "schedule": "", "schedule_state": "off", "mac": "000D6F00019E10A9", "savelog": "yes", "name": "aquarium"}, {"switch_state": "on", "monitor": "no", "schedule": "", "schedule_state": "off", "mac": "000D6F00019E1101", "savelog": "yes", "name": "vriezer"}, {"switch_state": "on", "monitor": "yes", "schedule": "", "schedule_state": "off", "mac": "000D6F0001A44629", "savelog": "yes", "name": "zonnepanelen-500"}, {"switch_state": "on", "monitor": "no", "schedule": "", "schedule_state": "off", "mac": "000D6F00019E1A1E", "savelog": "yes", "name": "kamer_t"}, {"switch_state": "on", "monitor": "no", "schedule": "", "schedule_state": "off", "mac": "000D6F00019E08AF", "savelog": "yes", "name": "koelkast_g"}, {"switch_state": "on", "monitor": "yes", "schedule": "", "schedule_state": "off", "mac": "000D6F00019E10FC", "savelog": "yes", "name": "zonnepanelen-1710"}, {"switch_state": "on", "monitor": "yes", "schedule": "", "schedule_state": "off", "mac": "000D6F0001A449C3", "savelog": "yes", "name": "nas"}, {"switch_state": "off", "monitor": "yes", "schedule": "testsched1", "schedule_state": "on", "mac": "000D6F00019E1A25", "savelog": "yes", "name": "meter"}]}

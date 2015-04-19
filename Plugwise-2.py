@@ -26,7 +26,10 @@
 from serial.serialutil import SerialException
 
 from plugwise import *
-import plugwise.util
+from swutil.util import *
+from swutil.pwmqtt import *
+from plugwise.api import *
+
 from datetime import datetime, timedelta
 import time
 import calendar
@@ -40,26 +43,24 @@ import itertools
 
 mqtt = True
 try:
-    import mosquitto
+    import paho.mqtt.client as mosquitto
 except:
-    try:
-        import plugwise.mosquitto
-    except:
-        mqtt = False
+    mqtt = False
+print mqtt
 
 import pprint as pp
 import json
-#from json import encoder
 
+#from json import encoder
 #encoder.FLOAT_REPR = lambda o: format(o, '.2f')
 json.encoder.FLOAT_REPR = lambda f: ("%.2f" % f)
 
 def jsondefault(o):
     return o.__dict__
 
-#plugwise.util.DEBUG_PROTOCOL = False
-plugwise.util.LOG_COMMUNICATION = True
-#plugwise.util.LOG_LEVEL = 2
+#DEBUG_PROTOCOL = False
+LOG_COMMUNICATION = True
+#LOG_LEVEL = 2
 
 schedules_path = "config/schedules"
 cfg = json.load(open("config/pw-hostconfig.json"))
@@ -372,7 +373,7 @@ class PWControl(object):
             i += 1
         #set log settings
         if controls.has_key('log_comm'):
-            plugwise.util.LOG_COMMUNICATION = controls['log_comm'].strip().lower() == 'yes'
+            LOG_COMMUNICATION = controls['log_comm'].strip().lower() == 'yes'
         if controls.has_key('log_level'):
             if controls['log_level'].strip().lower() == 'debug':
                 log_level(logging.DEBUG)
@@ -731,9 +732,12 @@ class PWControl(object):
         if updated:
             self.write_control_file()
             self.last_control_ts = os.stat(self.control_fn).st_mtime
+    
+    def ftopic(self, keyword, mac):
+        return str("plugwise2py/state/" + keyword +"/" + mac)
 
     def publish_circle_state(self, mac):
-        qpub.put(("circle", mac, self.get_status_json(mac)))
+        qpub.put((self.ftopic("circle", mac), str(self.get_status_json(mac))))
 
     def write_control_file(self):
         #write control file for testing purposes
@@ -772,7 +776,7 @@ class PWControl(object):
                 self.curfile.write("%s, %.2f\n" % (mac, usage))
                 #debug("MQTT put value in qpub")
                 msg = str('{"typ":"pwpower","ts":%d,"mac":"%s","power":%.2f}' % (ts, mac, usage))
-                qpub.put(("power", mac, msg))
+                qpub.put((self.ftopic("power", mac), msg))
             except ValueError:
                 #print("%5d, " % (ts,))
                 f.write("%5d, \n" % (ts,))
@@ -990,7 +994,7 @@ class PWControl(object):
                     f.write("%s, %s, %s\n" % (ts_str, watt, watt_hour))
                     #debug("MQTT put value in qpub")
                     msg = str('{"typ":"pwenergy","ts":%s,"mac":"%s","power":%s,"energy":%s,"interval":%d}' % (ts_str, mac, watt.strip(), watt_hour.strip(),c.interval))
-                    qpub.put(("energy", mac, msg))
+                    qpub.put((self.ftopic("energy", mac), msg))
             if not f == None:
                 f.close()
                 
@@ -1285,7 +1289,8 @@ try:
         error("No MQTT python binding installed (mosquitto-python)")
     elif cfg.has_key('mqtt_ip') and cfg.has_key('mqtt_port'):
         #connect to server and start worker thread.
-        mqttclient = Mqtt_client(cfg['mqtt_ip'], cfg['mqtt_port'], qpub, qsub)
+        mqttclient = Mqtt_client(cfg['mqtt_ip'], cfg['mqtt_port'], qpub, qsub, "Plugwise-2-py")
+        mqttclient.subscribe("plugwise2py/cmd/#")
         mqtt_t = threading.Thread(target=mqttclient.run)
         mqtt_t.setDaemon(True)
         mqtt_t.start()

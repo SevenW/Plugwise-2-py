@@ -1,6 +1,6 @@
 #!/bin/env python
 
-# Copyright (C) 2012,2013,2014 Seven Watt <info@sevenwatt.com>
+# Copyright (C) 2012,2013,2014,2015 Seven Watt <info@sevenwatt.com>
 # <http://www.sevenwatt.com>
 #
 # This file is part of Plugwise-2-py.
@@ -37,11 +37,10 @@ import time
 import math
 from datetime import datetime, timedelta
 import calendar
-
 import logging
-
 from serial.serialutil import SerialException
-from .util import *
+
+from swutil.util import *
 from .protocol import *
 from .exceptions import *
 
