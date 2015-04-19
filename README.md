@@ -112,29 +112,37 @@ Plugwise-2-py can be operated through a web interfaces. The packages comes with 
 
 ```shell
 #assume current directory is Plugwise-2-py main directory
-cd config
-nohup python Plugwise-2-web.py >>pwwebout.log&
+nohup python Plugwise-2-web.py 8000 secure plugwise:mysecret >>pwwebout.log&
 ```
 
-The website uses port 8000 by default, and can be changed by an optional parameter:
+This uses SSL/https. Change plugwise:mysecret in a username:password chosen by yourself. The websserver uses port 8000 by default, and can be changed by an optional parameter:
 
-`nohup python Plugwise-2-web.py 8001 >>pwwebout.log&`
+`nohup python Plugwise-2-web.py 8001 secure plugwise:mysecret >>pwwebout.log&`
 
-The use SSL (https) and a password provide more optional paramters:
+Providing a user:password is optional, as well as using SSL/https. When the website is only accessible within your LAN, then the server can be used as plain http, by omitting the secure parameter. The following parameter formats are valid:
 
-`nohup python Plugwise-2-web.py 8000 secure user:password >>pwwebout.log&`
+```shell
+nohup python Plugwise-2-web.py 8001 secure user:password >>pwwebout.log&
 
-change user and password to user credentials of your liking.
+#no username and password requested
+nohup python Plugwise-2-web.py 8000 secure >>pwwebout.log&
+
+#plain http, with optional port
+nohup python Plugwise-2-web.py 8002 >>pwwebout.log&
+
+#plain http, default port 8000
+nohup python Plugwise-2-web.py 8002 >>pwwebout.log&
+```
 
 ##use
 ###Control (switch and monitor)
 type in browser
 
-`http://<ip of the server>:8000`
+`https://<ip of the server>:8000`
 
 or
 
-`http://<ip of the server>:8000/pw2py.html`
+`https://<ip of the server>:8000/pw2py.html`
 
 for example:
 
