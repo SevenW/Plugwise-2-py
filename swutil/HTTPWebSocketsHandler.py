@@ -45,13 +45,13 @@ class HTTPWebSocketsHandler(SimpleHTTPRequestHandler):
             if self.handshake_done:
                 try:
                     self.read_next_message()
-                except err:
+                except Exception as err:
                     print err
                     #websocket content error, time-out or disconnect.
                     #Close the websocket
                     try: 
                         self.send_close()
-                    except err:
+                    except Exception as err:
                         print err
                     self.handshake_done = False
                     self.connection_close = 1
