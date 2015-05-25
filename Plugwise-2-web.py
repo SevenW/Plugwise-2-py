@@ -137,6 +137,10 @@ class PW2PYwebHandler(HTTPWebSocketsHandler):
     def log_error(self, format, *args):
         error(self.address_string()+' '+format % args)
 
+    def end_headers(self):
+        self.send_header("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
+        HTTPWebSocketsHandler.end_headers(self)
+
     def do_GET(self):
         #self.log_message("PW2PYwebHandler do_GET")
         #debug("GET " + self.path)
@@ -310,9 +314,15 @@ def main():
         server.daemon_threads = True
         server.auth = b64encode(credentials)
         if secure:
-            #ssl_version=ssl.PROTOCOL_TLSv1 avoids POODLE vulnerability
-            server.socket = ssl.wrap_socket (server.socket, certfile='./server.pem', server_side=True, ssl_version=ssl.PROTOCOL_TLSv1)
-            #server.socket = ssl.wrap_socket (server.socket, certfile='./server.pem', server_side=True)
+            #server.socket = ssl.wrap_socket (server.socket, certfile='./server.pem', server_side=True, ssl_version=ssl.PROTOCOL_TLSv1_2)
+            ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+            ctx.load_cert_chain(certfile="./server.pem")
+            ctx.options |= ssl.OP_NO_TLSv1
+            ctx.options |= ssl.OP_NO_TLSv1_1
+            ctx.options |= ssl.OP_CIPHER_SERVER_PREFERENCE
+            ctx.set_ciphers('ECDHE-RSA-AES256-GCM-SHA384 ECDHE-RSA-AES256-SHA384 ECDHE-RSA-AES256-SHA')
+            server.socket = ctx.wrap_socket(server.socket, server_side=True)
+            
             info('started secure https server at port %d' % (port,))
         else: 
             info('started http server at port %d' % (port,))
