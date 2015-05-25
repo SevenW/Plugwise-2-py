@@ -38,11 +38,16 @@ from SimpleHTTPServer import SimpleHTTPRequestHandler
 import ssl
 from base64 import b64encode
 
-from libraries import *
-from libraries.util import *
-from libraries.pwmqtt import *
-from libraries.HTTPWebSocketsHandler import HTTPWebSocketsHandler
+from swutil import *
+from swutil.util import *
+from swutil.pwmqtt import *
+from swutil.HTTPWebSocketsHandler import HTTPWebSocketsHandler
     
+#webroot is the config folder in Plugwise-2-py.
+#webserver can only serve files from webroot and subfolders.
+#the webroot needs to be the current folder
+webroot = os.curdir + os.sep + "config" + os.sep
+os.chdir(webroot)
 cfg = json.load(open("pw-hostconfig.json"))
 
 #global var
@@ -69,12 +74,9 @@ import threading
 
 mqtt = True
 try:
-    import mosquitto
+    import paho.mqtt.client as mosquitto
 except:
-    try:
-        import libraries.mosquitto
-    except:
-        mqtt = False
+    mqtt = False
         
 qpub = Queue.Queue()
 qsub = Queue.Queue()
@@ -85,7 +87,7 @@ if  not mqtt:
     error("No MQTT python binding installed (mosquitto-python)")
 elif cfg.has_key('mqtt_ip') and cfg.has_key('mqtt_port'):
     #connect to server and start worker thread.
-    mqttclient = Mqtt_client(cfg['mqtt_ip'], cfg['mqtt_port'], qpub, qsub)
+    mqttclient = Mqtt_client(cfg['mqtt_ip'], cfg['mqtt_port'], qpub, qsub, "Plugwise-2-web")
     mqttclient.subscribe("plugwise2py/state/#")
     mqtt_t = threading.Thread(target=mqttclient.run)
     mqtt_t.setDaemon(True)
@@ -129,11 +131,11 @@ info("Broadcast thread started")
     
  
 class PW2PYwebHandler(HTTPWebSocketsHandler):
-    # def log_message(self, format, *args):
-        # debug(self.address_string()+' '+format % args)
+    def log_message(self, format, *args):
+        debug(self.address_string()+' '+format % args)
 
-    # def log_error(self, format, *args):
-        # error(self.address_string()+' '+format % args)
+    def log_error(self, format, *args):
+        error(self.address_string()+' '+format % args)
 
     def do_GET(self):
         #self.log_message("PW2PYwebHandler do_GET")
@@ -149,7 +151,7 @@ class PW2PYwebHandler(HTTPWebSocketsHandler):
         debug("PW2PYwebHandler.do_GET() parsed: " + path)
         if path == '/schedules':
             #retrieve list of schedules
-            schedules = [os.path.splitext(os.path.basename(x))[0] for x in glob.glob(os.curdir + os.sep + 'schedules/*.json')]
+            schedules = [os.path.splitext(os.path.basename(x))[0] for x in glob.glob(os.curdir + os.sep + 'schedules' + os.sep + '*.json')]
             #print schedules
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
