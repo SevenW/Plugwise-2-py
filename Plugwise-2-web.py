@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (C) 2014,2015 Seven Watt <info@sevenwatt.com>
+# Copyright (C) 2014, 2015 Seven Watt <info@sevenwatt.com>
 # <http://www.sevenwatt.com>
 #
 # This file is part of Plugwise-2.
@@ -38,15 +38,11 @@ from SimpleHTTPServer import SimpleHTTPRequestHandler
 import ssl
 from base64 import b64encode
 
-from swutil.util import *
-from swutil.pwmqtt import *
-from swutil.HTTPWebSocketsHandler import HTTPWebSocketsHandler
+from libraries import *
+from libraries.util import *
+from libraries.pwmqtt import *
+from libraries.HTTPWebSocketsHandler import HTTPWebSocketsHandler
     
-#webroot is the config folder in Plugwise-2-py.
-#webserver can only serve files from webroot and subfolders.
-#the webroot needs to be the current folder
-webroot = os.curdir + os.sep + "config" + os.sep
-os.chdir(webroot)
 cfg = json.load(open("pw-hostconfig.json"))
 
 #global var
@@ -73,18 +69,23 @@ import threading
 
 mqtt = True
 try:
-    import paho.mqtt.client as mosquitto
+    import mosquitto
 except:
-    mqtt = False
+    try:
+        import libraries.mosquitto
+    except:
+        mqtt = False
         
 qpub = Queue.Queue()
 qsub = Queue.Queue()
+broadcast = []
+bcmutex = threading.Lock()
 mqtt_t = None
 if  not mqtt:
     error("No MQTT python binding installed (mosquitto-python)")
 elif cfg.has_key('mqtt_ip') and cfg.has_key('mqtt_port'):
     #connect to server and start worker thread.
-    mqttclient = Mqtt_client(cfg['mqtt_ip'], cfg['mqtt_port'], qpub, qsub, "Plugwise-2-web")
+    mqttclient = Mqtt_client(cfg['mqtt_ip'], cfg['mqtt_port'], qpub, qsub)
     mqttclient.subscribe("plugwise2py/state/#")
     mqtt_t = threading.Thread(target=mqttclient.run)
     mqtt_t.setDaemon(True)
@@ -93,11 +94,12 @@ elif cfg.has_key('mqtt_ip') and cfg.has_key('mqtt_port'):
 else:
     error("No MQTT broker and port configured")
     mqtt = False
-
+    
 if len(sys.argv) > 1:
     port = int(sys.argv[1])
 else:
     port = 8000
+
 if len(sys.argv) > 2:
     secure = str(sys.argv[2]).lower()=="secure"
 else:
@@ -106,13 +108,36 @@ if len(sys.argv) > 3:
     credentials = str(sys.argv[3])
 else:
     credentials = ""
+    
+def broadcaster():
+    while True:
+        while not qsub.empty():
+            rcv = qsub.get()
+            topic = rcv[0]
+            payl = rcv[1]
+            debug("process_mqtt_commands: %s %s" % (topic, payl)) 
+            bcmutex.acquire()
+            for bq in broadcast:
+                bq.put(rcv)
+            bcmutex.release()
+        time.sleep(0.1)
+        
+bc_t = threading.Thread(target=broadcaster)
+bc_t.setDaemon(True)
+bc_t.start()
+info("Broadcast thread started")
+    
  
 class PW2PYwebHandler(HTTPWebSocketsHandler):
-    def log_message(self, format, *args):
-        info(format % args)
-        
+    # def log_message(self, format, *args):
+        # debug(self.address_string()+' '+format % args)
+
+    # def log_error(self, format, *args):
+        # error(self.address_string()+' '+format % args)
+
     def do_GET(self):
-        debug("GET " + self.path)
+        #self.log_message("PW2PYwebHandler do_GET")
+        #debug("GET " + self.path)
         if self.path in ['', '/', '/index']:
             self.path = '/index.html'
         #for this specific application this entry point:
@@ -121,20 +146,16 @@ class PW2PYwebHandler(HTTPWebSocketsHandler):
         #parse url
         purl = urlparse.urlparse(self.path)
         path = purl.path
-        debug("parsed: " + path)
+        debug("PW2PYwebHandler.do_GET() parsed: " + path)
         if path == '/schedules':
             #retrieve list of schedules
-            schedules = [os.path.splitext(os.path.basename(x))[0] for x in glob.glob(os.curdir + os.sep + 'schedules' + os.sep + '*.json')]
+            schedules = [os.path.splitext(os.path.basename(x))[0] for x in glob.glob(os.curdir + os.sep + 'schedules/*.json')]
             #print schedules
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
             self.wfile.write(json.dumps(schedules))
             return
-        
-        #websocket request?
-        #websocket url needs to have extension .ws. No test header required
-        #elif self.headers.get("Upgrade", None) == "websocket":
         #
         #only allow certain file types to be retrieved
         elif any(path.endswith(x) for x in ('.ws','.html','.js','.css','.png','.jpg','.gif', '.svg', '.ttf', '.woff', '.txt','.map','.json')):
@@ -144,8 +165,8 @@ class PW2PYwebHandler(HTTPWebSocketsHandler):
 
 
     def do_POST(self):
+        #self.log_message("PW2PYwebHandler do_POST")
         #self.logRequest()
-                
         path = self.path
         ctype, pdict = cgi.parse_header(self.headers.getheader('content-type'))
         
@@ -153,7 +174,6 @@ class PW2PYwebHandler(HTTPWebSocketsHandler):
             clienttype = "ajax    "
         else:
             clienttype = "angular "
-
 
         info("%s POST: Path %s" % (clienttype, path))
         debug("%s POST: Content-type %s" % (clienttype, ctype))
@@ -231,7 +251,6 @@ class PW2PYwebHandler(HTTPWebSocketsHandler):
                 self.wfile.write(json.dumps({ "result": "ok"}))
                 return
 
-        
         info("POST unhandled. Send 404.")
         self.send_response(404, "unsupported POST")
         self.send_header('Content-type', 'application/json')
@@ -242,46 +261,44 @@ class PW2PYwebHandler(HTTPWebSocketsHandler):
     def on_ws_message(self, message):
         if message is None:
             message = ''
-        # # echo message back to client
-        # self.send_message(str(message))
-        self.log_message('websocket received "%s"',str(message))
+        #self.log_message('websocket received "%s"',str(message))
         try:
             data = json.loads(message)
             topic = str(data['topic'])
             payload = json.dumps(data['payload'])
             qpub.put((topic, payload))
         except Exception as err:
-            #print("Error parsing incoming websocket message: %s", err)
-            error("Error parsing incoming websocket message: %s", err)
+            self.log_error("Error parsing incoming websocket message: %s", err)
 
     def on_ws_connected(self):
-        self.log_message('%s','websocket connected')
+        self.q = Queue.Queue()
+        bcmutex.acquire()
+        broadcast.append(self.q)
+        bcmutex.release()
         self.t = threading.Thread(target=self.process_mqtt)
         self.t.daemon = True
         self.t.start()
+        #self.log_message("process_mqtt running on worker thread %d" % self.t.ident)
 
     def on_ws_closed(self):
-        self.log_message('%s','websocket closed')
+        bcmutex.acquire()
+        broadcast.remove(self.q)
+        bcmutex.release()
+        #join gives issues. threads seems to be reused, so threads end anyways.
+        #self.t.join()
+        #self.log_message("on_ws_closed websocket closed for handler %s" % str(self))
         
     def process_mqtt(self):
-        while self.handshake_done:
-            while not qsub.empty():
-                rcv = qsub.get()
+        while self.connected:
+            while not self.q.empty():
+                rcv = self.q.get()
                 topic = rcv[0]
                 payl = rcv[1]
-                info("process_mqtt_commands: %s %s" % (topic, payl)) 
-                if self.handshake_done:
+                #info("process_mqtt_commands: %s %s" % (topic, payl)) 
+                if self.connected:
                     self.send_message(payl)
             time.sleep(0.5)
     
-    # def handle(self):
-        # """Handle multiple requests if necessary."""
-        # self.close_connection = 1
-
-        # self.handle_one_request()
-        # while not self.close_connection:
-            # self.handle_one_request()
- 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     """Handle requests in a separate thread."""
  
@@ -293,18 +310,15 @@ def main():
         if secure:
             #ssl_version=ssl.PROTOCOL_TLSv1 avoids POODLE vulnerability
             server.socket = ssl.wrap_socket (server.socket, certfile='./server.pem', server_side=True, ssl_version=ssl.PROTOCOL_TLSv1)
+            #server.socket = ssl.wrap_socket (server.socket, certfile='./server.pem', server_side=True)
             info('started secure https server at port %d' % (port,))
         else: 
             info('started http server at port %d' % (port,))
-        #process_mqtt_commands()
         server.serve_forever()
     except KeyboardInterrupt:
         print('^C received, shutting down server')
-        info('^C received, shutting down server')
-        #server.socket.close()
         server.shutdown()
         print "exit after server.shutdown()"
-        info("exit after server.shutdown()")
 
 if __name__ == '__main__':
     main()

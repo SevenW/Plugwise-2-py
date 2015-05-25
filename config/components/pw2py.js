@@ -45,10 +45,16 @@ app.controller("pw2pyCtrl", function pw2pyCtrl($scope, $http, WS){
 							circle.icon = "fa-plug"
 						}
 						
+						//TESTCODE
+						circle.alwayson = !(circle.name == 'circle+');
+						
+						
  						$scope.circles.push(circle);
 						console.log(dynconf);
 						console.log(statconf);
 						console.log(circle);
+						
+						//WS.connect();
 					}
 				}).
 				error(function(data, status, headers, config) {
@@ -131,7 +137,14 @@ app.controller("pw2pyCtrl", function pw2pyCtrl($scope, $http, WS){
   WS.subscribe(function(message) {
     //$scope.messages.push(message);
 	$scope.lastmessage = message;
-	var msg = JSON.parse(message);
+	var msg;
+	try{
+		msg = JSON.parse(message);
+	}
+	catch(e){
+		console.log('Websocket message is not JSON: '+e.message);
+		return;
+	}
 	var circle = getByMac($scope.circles, msg.mac);
 	var power = "X"
 	if (msg.hasOwnProperty('power')) {
@@ -231,17 +244,19 @@ app.factory('WS', function() {
     var host = window.location.host;
 	var ws;
 	if (window.location.protocol == 'https:') {
-		ws = new WebSocket("wss://"+host+"/socket.ws");
+		//ws = new WebSocket("wss://"+host+"/socket.ws");
+		ws = new ReconnectingWebSocket("wss://"+host+"/socket.ws");
 	} else {
-		ws = new WebSocket("ws://"+host+"/socket.ws");
+		//ws = new WebSocket("ws://"+host+"/socket.ws");
+		ws = new ReconnectingWebSocket("ws://"+host+"/socket.ws");
 	}
  
     ws.onopen = function() {
-      service.callback("Succeeded to open a connection");
+      service.callback('{"result": "Succeeded to open a connection"}');
     };
  
     ws.onerror = function() {
-      service.callback("Failed to open a connection");
+      service.callback('{"result": "Failed to open a connection"}');
     }
  
     ws.onmessage = function(message) {
