@@ -1287,18 +1287,12 @@ try:
     mqtt_t = None
     if  not mqtt:
         error("No MQTT python binding installed (mosquitto-python)")
-    #With user and password
-    elif cfg.has_key('mqtt_ip') and cfg.has_key('mqtt_port') and cfg.has_key('mqtt_user') and cfg.has_key('mqtt_password'):
-        #connect to server and start worker thread.
-        mqttclient = Mqtt_client(cfg['mqtt_ip'], cfg['mqtt_port'], qpub, qsub,cfg['mqtt_user'],cfg['mqtt_password'])
-        mqtt_t = threading.Thread(target=mqttclient.run)
-        mqtt_t.setDaemon(True)
-        mqtt_t.start()
-        info("MQTT thread started")
-    #Anon
     elif cfg.has_key('mqtt_ip') and cfg.has_key('mqtt_port'):
         #connect to server and start worker thread.
-        mqttclient = Mqtt_client(cfg['mqtt_ip'], cfg['mqtt_port'], qpub, qsub, "Plugwise-2-py")
+        if cfg.has_key('mqtt_user') and cfg.has_key('mqtt_password'):
+            mqttclient = Mqtt_client(cfg['mqtt_ip'], cfg['mqtt_port'], qpub, qsub,"Plugwise-2-py",cfg['mqtt_user'],cfg['mqtt_password'])
+        else:
+            mqttclient = Mqtt_client(cfg['mqtt_ip'], cfg['mqtt_port'], qpub, qsub, "Plugwise-2-py")
         mqttclient.subscribe("plugwise2py/cmd/#")
         mqtt_t = threading.Thread(target=mqttclient.run)
         mqtt_t.setDaemon(True)
@@ -1312,4 +1306,4 @@ try:
     main.run()
 except:
     close_logcomm()
-    raise 
+    raise
