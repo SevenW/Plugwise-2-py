@@ -40,7 +40,7 @@ class Mqtt_client(object):
         
         #Set the username and password if any
         if self.user != None:
-    	    self.mqttc.username_pw_set(self.user,self.password)
+            self.mqttc.username_pw_set(self.user,self.password)
         
         return self._connect()
 
