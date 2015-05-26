@@ -76,26 +76,26 @@ class Mqtt_client(object):
             self.mqttc.subscribe(topic, qos)
             info("MQTT subscribed to %s" % topic)
 
-    def on_message(self, mosq, obj, msg):
-        info("MQTT " + msg.topic+" "+str(msg.payload))
-        self.qsub.put((msg.topic, str(msg.payload)))
+    def on_message(self, client, userdata, message):
+        debug("MQTT " + message.topic+" "+str(message.payload))
+        self.qsub.put((message.topic, str(message.payload)))
 
-    def on_connect(self, mosq, obj, flags, rc):
+    def on_connect(self, client, userdata, flags, rc):
         if rc == 0:
             info("MQTT connected return code 0")
         else:
             error("MQTT connected return code %d" % (self.rc,))
         self.rc = rc
             
-    def on_disconnect(self, mosq, obj, rc):
+    def on_disconnect(self, client, userdata, rc):
         self.rc = rc
         info("MQTT disconnected (from on_disconnect)")
 
-    def on_publish(self, mosq, obj, mid):
+    def on_publish(self, client, userdata, mid):
         debug("MQTT published message sequence number: "+str(mid))
 
-    def on_subscribe(self, mosq, obj, mid, granted_qos):
+    def on_subscribe(self, client, userdata, mid, granted_qos):
         info("MQTT Subscribed: "+str(mid)+" "+str(granted_qos))
 
-    # def on_log(self, mosq, obj, level, string):
-        # info(string)
+    # def on_log(self, client, userdata, level, buf):
+        # info(buf)
