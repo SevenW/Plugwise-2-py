@@ -137,6 +137,10 @@ class PW2PYwebHandler(HTTPWebSocketsHandler):
     def log_error(self, format, *args):
         error(self.address_string()+' '+format % args)
 
+    def log_request(self, code='-', size='-'):
+        #self.log_message('"%s" %s %s', self.requestline, str(code), str(size))
+        info(self.address_string()+' "%s" %s %s' % (self.requestline, str(code), str(size)))
+                         
     def end_headers(self):
         self.send_header("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
         HTTPWebSocketsHandler.end_headers(self)
