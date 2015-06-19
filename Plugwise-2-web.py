@@ -81,7 +81,7 @@ except:
 qpub = Queue.Queue()
 qsub = Queue.Queue()
 broadcast = []
-bcmutex = threading.Lock()
+#bcmutex = threading.Lock()
 mqtt_t = None
 if  not mqtt:
     error("No MQTT python binding installed (mosquitto-python)")
@@ -120,11 +120,11 @@ def broadcaster():
             rcv = qsub.get()
             topic = rcv[0]
             payl = rcv[1]
-            debug("process_mqtt_commands: %s %s" % (topic, payl)) 
-            bcmutex.acquire()
+            #debug("process_mqtt_commands: %s %s" % (topic, payl)) 
+            #bcmutex.acquire()
             for bq in broadcast:
                 bq.put(rcv)
-            bcmutex.release()
+            #bcmutex.release()
         time.sleep(0.1)
         
 bc_t = threading.Thread(target=broadcaster)
@@ -285,18 +285,18 @@ class PW2PYwebHandler(HTTPWebSocketsHandler):
 
     def on_ws_connected(self):
         self.q = Queue.Queue()
-        bcmutex.acquire()
+        #bcmutex.acquire()
         broadcast.append(self.q)
-        bcmutex.release()
+        #bcmutex.release()
         self.t = threading.Thread(target=self.process_mqtt)
         self.t.daemon = True
         self.t.start()
-        #self.log_message("process_mqtt running on worker thread %d" % self.t.ident)
+        self.log_message("process_mqtt running on worker thread %d" % self.t.ident)
 
     def on_ws_closed(self):
-        bcmutex.acquire()
+        #bcmutex.acquire()
         broadcast.remove(self.q)
-        bcmutex.release()
+        #bcmutex.release()
         #join gives issues. threads seems to be reused, so threads end anyways.
         #self.t.join()
         #self.log_message("on_ws_closed websocket closed for handler %s" % str(self))
@@ -311,10 +311,55 @@ class PW2PYwebHandler(HTTPWebSocketsHandler):
                 if self.connected:
                     self.send_message(payl)
             time.sleep(0.5)
+        self.log_message("process_mqtt exiting worker thread %d" % self.t.ident)
     
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     """Handle requests in a separate thread."""
- 
+
+#try to figure out hangups of server  
+import select
+import errno  
+
+def _eintr_retry(func, *args):
+    """restart a system call interrupted by EINTR"""
+    while True:
+        try:
+            return func(*args)
+        except (OSError, select.error) as e:
+            if e.args[0] != errno.EINTR:
+                raise
+            else:
+                info("errno.EINTR")
+
+
+
+def m_serve_forever(server, poll_interval=0.5):
+    """Handle one request at a time until shutdown.
+
+    Polls for shutdown every poll_interval seconds. Ignores
+    self.timeout. If you need to do periodic tasks, do them in
+    another thread.
+    """
+    spincount = 0
+    #server.__is_shut_down.clear()
+    try:
+        while 1: #not server.__shutdown_request:
+            # XXX: Consider using another file descriptor or
+            # connecting to the socket to wake this up instead of
+            # polling. Polling reduces our responsiveness to a
+            # shutdown request and wastes cpu at all other times.
+            spincount += 1
+            if spincount % 10000 == 0:
+                info("still serving forever")
+            r, w, e = _eintr_retry(select.select, [server], [], [],
+                                   poll_interval)
+            if server in r:
+                server._handle_request_noblock()
+    finally:
+        #server.__shutdown_request = False
+        #server.__is_shut_down.set()
+        pass
+
 def main():
     try:
         server = ThreadedHTTPServer(('', port), PW2PYwebHandler)
@@ -333,7 +378,8 @@ def main():
             info('started secure https server at port %d' % (port,))
         else: 
             info('started http server at port %d' % (port,))
-        server.serve_forever()
+        #server.serve_forever()
+        m_serve_forever(server)
     except KeyboardInterrupt:
         print('^C received, shutting down server')
         server.shutdown()
