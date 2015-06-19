@@ -1,7 +1,6 @@
 Plugwise-2-py
 =============
 
-
 #Key features: 
 - Web-interface to switch, configure and edit schedules and stand-by killer
 - MQTT interface for control and log meter readings.
