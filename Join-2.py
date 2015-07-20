@@ -374,13 +374,13 @@ class PWControl(object):
             i += 1
         #set log settings
         if controls.has_key('log_comm'):
-            log_comm(controls['log_comm'].strip().lower() == 'yes')
+            log_comm(str(controls['log_comm']).strip().lower() == 'yes')
         if controls.has_key('log_level'):
-            if controls['log_level'].strip().lower() == 'debug':
+            if str(controls['log_level']).strip().lower() == 'debug':
                 log_level(logging.DEBUG)
-            elif controls['log_level'].strip().lower() == 'info':
+            elif str(controls['log_level']).strip().lower() == 'info':
                 log_level(logging.INFO)
-            elif controls['log_level'].strip().lower() == 'error':
+            elif str(controls['log_level']).strip().lower() == 'error':
                 log_level(logging.ERROR)
             else:
                 log_level(logging.INFO)
