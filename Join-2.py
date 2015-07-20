@@ -372,12 +372,10 @@ class PWControl(object):
             self.controlsbymac[item['mac']]=i
             i += 1
         #set log settings
-        info("COMMU %s" % (controls,))
         if controls.has_key('log_comm'):
             log_comm(str(controls['log_comm']).strip().lower() == 'yes')
-            info("COMMU with %s" % (str(controls['log_comm']).strip().lower() == 'yes',))
-        else:
-            error("COMMU no key log_comm")
+            info("COMMU with str() %s" % (str(controls['log_comm']).strip().lower() == 'yes',))
+            info("COMMU with u %s" % (controls['log_comm'].strip().lower() == 'yes',))
         if controls.has_key('log_level'):
             if str(controls['log_level']).strip().lower() == 'debug':
                 log_level(logging.DEBUG)

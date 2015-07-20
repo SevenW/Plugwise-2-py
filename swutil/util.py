@@ -116,7 +116,6 @@ def close_logcomm():
     return
     
 def logcomm(msg):
-    info("COMMU called logcomm type %s value %s" % (type(LOG_COMMUNICATION), LOG_COMMUNICATION))
     if LOG_COMMUNICATION:
         #logcommfile.write("%s %s \n" % (datetime.datetime.now().isoformat(), msg,))
         pw_comm_logger.info(msg)
