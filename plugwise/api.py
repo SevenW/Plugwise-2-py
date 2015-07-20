@@ -622,6 +622,9 @@ class Circle(object):
             prev_dt = getattr(resp, "logdate1").value
         else:
             prev_dt = start_dt
+        if prev_dt is None:
+            error("get_power_usage_history: empty first entry in power buffer")
+            return []
         prev2_dt = prev_dt
         both = False
         for i in range(0, 4):
@@ -798,6 +801,9 @@ class Circle(object):
         log = self.get_power_usage_history(cur_idx)
         if len(log)<3:
             log = self.get_power_usage_history(cur_idx-1) + log
+        if len(log)<3:
+            error("_get_interval: to few entries in power buffer to determine interval")
+            return
         #debug(log)
         interval = log[-1][0]-log[-2][0]
         self.usage=True

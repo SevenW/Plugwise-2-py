@@ -863,7 +863,7 @@ class PWControl(object):
                             powlist[3][0].strftime("%Y-%m-%d %H:%M")))
                     elif first == 0:
                         powlist = c.get_power_usage_history(0)
-                        if powlist[0][0] is not None and powlist[1][0] is not None:
+                        if len(powlist) > 2 and powlist[0][0] is not None and powlist[1][0] is not None:
                             last_dt = powlist[0][0]
                             #subtract the interval between index 0 and 1
                             last_dt -= powlist[1][0] - powlist[0][0]
