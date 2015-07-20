@@ -60,7 +60,6 @@ def jsondefault(o):
 
 #DEBUG_PROTOCOL = False
 #LOG_COMMUNICATION = True
-log_comm(True)
 #LOG_LEVEL = 2
 
 schedules_path = "config/schedules"
@@ -1293,6 +1292,7 @@ class PWControl(object):
 
 init_logger(logpath+"pw-logger.log", "pw-logger")
 log_level(logging.DEBUG)
+log_comm(True)
 try:
     qpub = Queue.Queue()
     qsub = Queue.Queue()
