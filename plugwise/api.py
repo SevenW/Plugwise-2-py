@@ -167,7 +167,6 @@ class Stick(SerialComChannel):
                 if not issubclass(resp.__class__, PlugwiseAckResponse):
                     #Could be an Ack or AckMac or AcqAssociation error code response when same seqnr
                     try:
-                        error("TEST: %s" % (str(reason)[-4:],))
                         if (len(msg) == 22 and msg[0:1] == b'\x05') or (len(msg) == 23 and msg[0:1] == b'\x83'):
                             ackresp = PlugwiseAckResponse()
                             ackresp.unserialize(msg)
@@ -178,15 +177,6 @@ class Stick(SerialComChannel):
                             ackresp.unserialize(msg)
                             if self.is_in_sequence(ackresp, seqnr):
                                 return ackresp
-                        elif resp.function_code == "0006":
-                            info("entering unknown advertise MAC ")
-                            ackresp = PlugwiseAdvertiseNodeResponse()
-                            ackresp.unserialize(msg)
-                            info("unknown advertise MAC %s" % str(ackresp.mac))
-                        elif resp.function_code == "0061":
-                            ackresp = PlugwiseAckAssociationResponse()
-                            ackresp.unserialize(msg)
-                            info("unknown MAC associating %s" % str(ackresp.mac))
                         else:
                             #it does not appear to be a proper Ack message
                             #just retry to read next message
@@ -204,9 +194,39 @@ class Stick(SerialComChannel):
                         #response could be an error status message
                         logcomm("RERR %4d %s - <!> unexpected response error while interpreting as Ack: %s" % ( len(msg), repr(msg), str(reason)))
                         error("unexpected response [2]:"+str(reason))
+                error("TEST: %s" % (resp.function_code,))
+                if resp.function_code in ['0006', '0061']:
+                    #Could be an unsolicited AdvertiseNode or AcqAssociation response
+                    try:
+                        if resp.function_code == "0006":
+                            info("entering unknown advertise MAC ")
+                            ackresp = PlugwiseAdvertiseNodeResponse()
+                            ackresp.unserialize(msg)
+                            info("unknown advertise MAC %s" % str(ackresp.mac))
+                        elif resp.function_code == "0061":
+                            ackresp = PlugwiseAckAssociationResponse()
+                            ackresp.unserialize(msg)
+                            info("unknown MAC associating %s" % str(ackresp.mac))
+                        else:
+                            #it does not appear to be a proper Ack message
+                            #just retry to read next message
+                            logcomm("RERR %4d %s - <!> unexpected response error: %s" % ( len(msg), repr(msg), str(reason)))
+                            pass
+                    except ProtocolError as reason:
+                        #retry to receive the response
+                        logcomm("RERR %4d %s - <!> protocol error while interpreting as Advertise: %s" % ( len(msg), repr(msg), str(reason)))
+                        error("protocol error [5]:"+str(reason))
+                    except OutOfSequenceException as reason:
+                        #retry to receive the response
+                        logcomm("RERR %4d %s - <!> out of sequence while interpreting as Advertise: %s" % ( len(msg), repr(msg), str(reason)))
+                        error("protocol error [6]:"+str(reason))
+                    except UnexpectedResponse as reason:
+                        #response could be an error status message
+                        logcomm("RERR %4d %s - <!> unexpected response error while interpreting as Advertise: %s" % ( len(msg), repr(msg), str(reason)))
+                        error("unexpected response [3]:"+str(reason))
                 else:
                     logcomm("RERR %4d %s - <!> unexpected response error while expecting Ack: %s" % ( len(msg), repr(msg), str(reason)))                    
-                    error("unexpected response [3]:"+str(reason))
+                    error("unexpected response [4]:"+str(reason))
 
     def enable_joining(self, enabled):
         req = PlugwiseEnableJoiningRequest('', enabled)
