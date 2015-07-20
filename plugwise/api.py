@@ -143,7 +143,7 @@ class Stick(SerialComChannel):
         # expected that we constantly get unexpected messages
         while 1:
             try:
-                readlen = len(resp)
+                #readlen = len(resp)
                 #debug("expecting to read "+str(readlen)+" bytes for msg. "+str(resp))
                 msg = self._recv_response(retry_timeout)
                 resp.unserialize(msg)
@@ -165,7 +165,7 @@ class Stick(SerialComChannel):
                 else:
                     debug("unexpected response [1]:"+str(reason))
                 if not issubclass(resp.__class__, PlugwiseAckResponse):
-                    #Could be an Ack or AckMac error code response when same seqnr
+                    #Could be an Ack or AckMac or AcqAssociation error code response when same seqnr
                     try:
                         if (len(msg) == 22 and msg[0:1] == b'\x05') or (len(msg) == 23 and msg[0:1] == b'\x83'):
                             ackresp = PlugwiseAckResponse()
@@ -177,6 +177,10 @@ class Stick(SerialComChannel):
                             ackresp.unserialize(msg)
                             if self.is_in_sequence(ackresp, seqnr):
                                 return ackresp
+                        elif str(reason)[:-4] == "0061":
+                            ackresp = PlugwiseAckAssociationResponse()
+                            ackresp.unserialize(msg)
+                            info("unknown MAC associating %s", str(ackresp.mac))
                         else:
                             #it does not appear to be a proper Ack message
                             #just retry to read next message
@@ -823,9 +827,9 @@ class Circle(object):
         #Needs to be called on Circle+
         nodetable = []
         for idx in range(0,64):
-            req = PlugwisePopulateRequest(self.mac, idx)
+            req = PlugwiseAssociatedNodesRequest(self.mac, idx)
             _, seqnr  = self._comchan.send_msg(req.serialize())
-            resp = self._expect_response(PlugwisePopulateResponse, seqnr)
+            resp = self._expect_response(PlugwiseAssociatedNodesResponse, seqnr)
             nodetable.append(resp.node_mac_id.value)
         return nodetable
         

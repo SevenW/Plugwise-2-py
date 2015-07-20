@@ -314,11 +314,11 @@ class PlugwiseResponse(PlugwiseMessage):
             self.mac = response[12:28]
             response = response[28:-6]
         debug("DATA %4d %s" % (len(response), repr(response)))
-
-        if self.expected_command_counter != None and self.expected_command_counter != self.command_counter:
-            raise OutOfSequenceException("expected seqnr %s, received seqnr %s - this may be a duplicate message" % (self.expected_command_counter, self.command_counter))
+        
         if self.ID != 'FFFF' and function_code != self.ID:
             raise UnexpectedResponse("expected response code %s, received code %s" % (self.ID, function_code))
+        if self.expected_command_counter != None and self.expected_command_counter != self.command_counter:
+            raise OutOfSequenceException("expected seqnr %s, received seqnr %s - this may be a duplicate message" % (self.expected_command_counter, self.command_counter))
         if raw_msg_len != len(self):
             raise UnexpectedResponse("response doesn't have expected length. expected %d bytes got %d" % (len(self), raw_msg_len))
         
@@ -538,7 +538,7 @@ class PlugwisePingResponse(PlugwiseResponse):
         self.pingtime = Int(0, 4)
         self.params += [self.qin, self.qout, self.pingtime]
               
-class PlugwisePopulateResponse(PlugwiseResponse):
+class PlugwiseAssociatedNodesResponse(PlugwiseResponse):
     ID = b'0019'
 
     def __init__(self, seqnr = None):
@@ -610,7 +610,14 @@ class PlugwiseRemoveNodeResponse(PlugwiseResponse):
         PlugwiseResponse.__init__(self, seqnr)
         self.node_mac_id = String(None, length=16)
         self.status = Int(0, 2)
-        self.params += [self.node_mac_id, self.status]              
+        self.params += [self.node_mac_id, self.status]  
+
+class PlugwiseAckAssociationResponse(PlugwiseResponse):
+    ID = b'0061'
+
+    def __init__(self, seqnr = None):
+        #sequence number is always FFFD
+        PlugwiseResponse.__init__(self, 0xFFFD)       
         
 class PlugwiseRequest(PlugwiseMessage):
     def __init__(self, mac):
@@ -748,7 +755,7 @@ class PlugwisePingRequest(PlugwiseRequest):
     def __init__(self, mac):
         PlugwiseRequest.__init__(self, mac)
 
-class PlugwisePopulateRequest(PlugwiseRequest):
+class PlugwiseAssociatedNodesRequest(PlugwiseRequest):
     """Send populate request"""
     ID = b'0018'
     
@@ -817,7 +824,7 @@ class PlugwiseConnectCirclePlusRequest(PlugwiseRequest):
         return full_msg
     
 class PlugwiseRemoveNodeRequest(PlugwiseRequest):
-    """Send populate request"""
+    """Send remove node from network request"""
     ID = b'001C'
     
     def __init__(self, mac, removemac):
@@ -825,7 +832,7 @@ class PlugwiseRemoveNodeRequest(PlugwiseRequest):
         self.args.append(String(removemac, length=16))
 
 class PlugwiseResetRequest(PlugwiseRequest):
-    """Send populate request"""
+    """Send preset circle request"""
     ID = b'0009'
     
     def __init__(self, mac, moduletype, timeout):
