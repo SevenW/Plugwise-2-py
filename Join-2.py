@@ -376,6 +376,7 @@ class PWControl(object):
         info("COMMU %s" % (controls,))
         if controls.has_key('log_comm'):
             log_comm(str(controls['log_comm']).strip().lower() == 'yes')
+            info("COMMU with %s" % (str(controls['log_comm']).strip().lower() == 'yes',))
         else:
             error("COMMU no key log_comm")
         if controls.has_key('log_level'):
