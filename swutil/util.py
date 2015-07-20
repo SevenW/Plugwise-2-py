@@ -79,6 +79,9 @@ def init_logger(logfname, appname='plugwise2py'):
 def log_level(level=logging.DEBUG):
     pw_logger.setLevel(level)
 
+def log_comm(enable = False):
+    LOG_COMMUNICATION = enable
+
 def debug(msg):
     #if __debug__ and DEBUG_PROTOCOL:
         #print("%s: %s" % (datetime.datetime.now().isoformat(), msg,))

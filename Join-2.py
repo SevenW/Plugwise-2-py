@@ -59,7 +59,8 @@ def jsondefault(o):
     return o.__dict__
 
 #DEBUG_PROTOCOL = False
-LOG_COMMUNICATION = True
+#LOG_COMMUNICATION = True
+log_comm(True)
 #LOG_LEVEL = 2
 
 schedules_path = "config/schedules"
@@ -373,7 +374,7 @@ class PWControl(object):
             i += 1
         #set log settings
         if controls.has_key('log_comm'):
-            LOG_COMMUNICATION = controls['log_comm'].strip().lower() == 'yes'
+            log_comm(controls['log_comm'].strip().lower() == 'yes')
         if controls.has_key('log_level'):
             if controls['log_level'].strip().lower() == 'debug':
                 log_level(logging.DEBUG)
