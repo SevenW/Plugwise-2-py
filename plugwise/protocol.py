@@ -558,8 +558,6 @@ class PlugwiseAdvertiseNodeResponse(PlugwiseResponse):
 
     def __init__(self, seqnr = None):
         PlugwiseResponse.__init__(self, seqnr)
-        self.node_mac_id = String(None, length=16)
-        self.params += [self.node_mac_id]
               
 class PlugwiseQueryCirclePlusResponse(PlugwiseResponse):
     ID = b'0002'
