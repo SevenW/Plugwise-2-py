@@ -317,6 +317,8 @@ class PlugwiseResponse(PlugwiseMessage):
         
         if function_code in ['0006', '0061']:
             error("response.unserialize: detected %s expected %s" % (function_code, self.ID))
+            error("response.unserialize: type %s type %s type %s type %s" % (type(function_code), type(self.ID), type('FFFF'), type(b'FFFF')))
+            error("response.unserialize: equal %s equal %s" % ((self.ID != 'FFFF'), (function_code != self.ID)))
         
         if self.ID != 'FFFF' and function_code != self.ID:
             raise UnexpectedResponse("expected response code %s, received code %s" % (self.ID, function_code))
