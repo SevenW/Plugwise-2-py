@@ -178,11 +178,11 @@ class Stick(SerialComChannel):
                             ackresp.unserialize(msg)
                             if self.is_in_sequence(ackresp, seqnr):
                                 return ackresp
-                        elif str(reason)[-4:] == "0006":
+                        elif ackresp.function_code == "0006":
                             ackresp = PlugwiseAdvertiseNodeResponse()
                             ackresp.unserialize(msg)
                             info("unknown advertise MAC %s" % str(ackresp.mac))
-                        elif str(reason)[-4:] == "0061":
+                        elif ackresp.function_code == "0061":
                             ackresp = PlugwiseAckAssociationResponse()
                             ackresp.unserialize(msg)
                             info("unknown MAC associating %s" % str(ackresp.mac))

@@ -269,6 +269,7 @@ class PlugwiseResponse(PlugwiseMessage):
         self.params = []
 
         self.mac = None
+        self.function_code = None
         self.command_counter = None
         self.expected_command_counter = seqnr
 
@@ -283,7 +284,7 @@ class PlugwiseResponse(PlugwiseMessage):
             response = response[1:]
             header5 = True
                 
-        header, function_code, self.command_counter = struct.unpack("4s4s4s", response[:12])
+        header, self.function_code, self.command_counter = struct.unpack("4s4s4s", response[:12])
         crc, footer = struct.unpack("4s2s", response[-6:])
         raw_msg_len = len(response)
         
@@ -303,28 +304,24 @@ class PlugwiseResponse(PlugwiseMessage):
                 header = '--->'
         if crc != self.calculate_checksum(response[4:-6]):
             protocol_error = "checksum error!"
-        debug("STRU      "+repr(header)+" "+repr(function_code)+" "+repr(self.command_counter)+" <data> "+repr(crc)+" "+repr(footer))
+        debug("STRU      "+repr(header)+" "+repr(self.function_code)+" "+repr(self.command_counter)+" <data> "+repr(crc)+" "+repr(footer))
         if len(protocol_error) > 0:
             raise ProtocolError(protocol_error)
             
             
-        if function_code in ['0000', '0002', '0003', '0005']:
+        if self.function_code in ['0000', '0002', '0003', '0005']:
             response = response[12:-6]
         else:
             self.mac = response[12:28]
             response = response[28:-6]
         debug("DATA %4d %s" % (len(response), repr(response)))
         
-        if function_code in ['0006', '0061']:
-            error("response.unserialize: detected %s expected %s" % (function_code, self.ID))
-            error("response.unserialize: type %s type %s type %s type %s" % (type(function_code), type(self.ID), type('FFFF'), type(b'FFFF')))
-            error("response.unserialize: equal %s equal %s" % ((self.ID != 'FFFF'), (function_code != self.ID)))
+        if self.function_code in ['0006', '0061']:
+            error("response.unserialize: detected %s expected %s" % (self.function_code, self.ID))
         
-        if self.ID != 'FFFF' and function_code != self.ID:
-            error("response.unserialize: raise Unexpected")
-            raise UnexpectedResponse("expected response code %s, received code %s" % (self.ID, function_code))
+        if self.ID != 'FFFF' and self.function_code != self.ID:
+            raise UnexpectedResponse("expected response code %s, received code %s" % (self.ID, self.function_code))
         if self.expected_command_counter != None and self.expected_command_counter != self.command_counter:
-            error("response.unserialize: raise OutOfSeq")
             raise OutOfSequenceException("expected seqnr %s, received seqnr %s - this may be a duplicate message" % (self.expected_command_counter, self.command_counter))
         if raw_msg_len != len(self):
             raise UnexpectedResponse("response doesn't have expected length. expected %d bytes got %d" % (len(self), raw_msg_len))
@@ -334,7 +331,7 @@ class PlugwiseResponse(PlugwiseMessage):
             logmac = '................'
         else:
             logmac = self.mac
-        if function_code in ['0000', '0003', '0005']:
+        if self.function_code in ['0000', '0003', '0005']:
             #HACK: retrieve info from Acq and AcqMac responses
             respstatus = response[:4]
             logresp = ''
@@ -343,8 +340,8 @@ class PlugwiseResponse(PlugwiseMessage):
         else:
             respstatus = '....'
             logresp = response
-        logcomm("RECV %4d %s %4s %4s %4s %16s %s %4s %s" % (raw_msg_len, header, function_code, self.command_counter, respstatus, logmac, logresp, crc, footer))
-        #logcomm("RECV      "+repr(header)+" "+repr(function_code)+" "+repr(self.command_counter)+" <data> "+repr(crc)+" "+repr(footer))
+        logcomm("RECV %4d %s %4s %4s %4s %16s %s %4s %s" % (raw_msg_len, header, self.function_code, self.command_counter, respstatus, logmac, logresp, crc, footer))
+        #logcomm("RECV      "+repr(header)+" "+repr(self.function_code)+" "+repr(self.command_counter)+" <data> "+repr(crc)+" "+repr(footer))
         
         # FIXME: check function code match
         response = self._parse_params(response)
@@ -381,7 +378,9 @@ class PlugwiseAckResponse(PlugwiseResponse):
         try:
             PlugwiseResponse.unserialize(self, response)
         except UnexpectedResponse as reason:
-            if self.expected_command_counter is None:
+            if self.function_code not is None and self.function_code in ['0006', '0061']:
+                raise
+            elif self.expected_command_counter is None:
                 #In case of awaiting an Ack without knowing a seqnr, the most likely reason of
                 #an UnexpectedResponse is a duplicate (ghost) response from an older SEND request.
                 raise OutOfSequenceException("expected command ack from stick. received message with seqnr %s - this may be a duplicate message" % (self.command_counter,))
