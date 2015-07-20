@@ -321,8 +321,10 @@ class PlugwiseResponse(PlugwiseMessage):
             error("response.unserialize: equal %s equal %s" % ((self.ID != 'FFFF'), (function_code != self.ID)))
         
         if self.ID != 'FFFF' and function_code != self.ID:
+            error("response.unserialize: raise Unexpected")
             raise UnexpectedResponse("expected response code %s, received code %s" % (self.ID, function_code))
         if self.expected_command_counter != None and self.expected_command_counter != self.command_counter:
+            error("response.unserialize: raise OutOfSeq")
             raise OutOfSequenceException("expected seqnr %s, received seqnr %s - this may be a duplicate message" % (self.expected_command_counter, self.command_counter))
         if raw_msg_len != len(self):
             raise UnexpectedResponse("response doesn't have expected length. expected %d bytes got %d" % (len(self), raw_msg_len))
