@@ -46,7 +46,7 @@ app.controller("pw2pyCtrl", function pw2pyCtrl($scope, $http, WS){
 						}
 						
 						//TESTCODE
-						circle.alwayson = !(circle.name == 'circle+');
+						//circle.alwayson = !(circle.name == 'circle+');
 						
 						
  						$scope.circles.push(circle);
