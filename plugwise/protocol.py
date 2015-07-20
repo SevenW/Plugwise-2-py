@@ -316,7 +316,7 @@ class PlugwiseResponse(PlugwiseMessage):
         debug("DATA %4d %s" % (len(response), repr(response)))
         
         if function_code in ['0006', '0061']:
-            error("response.unserialize: detected %s", % (function_code,))
+            error("response.unserialize: detected %s" % (function_code,))
         
         if self.ID != 'FFFF' and function_code != self.ID:
             raise UnexpectedResponse("expected response code %s, received code %s" % (self.ID, function_code))
