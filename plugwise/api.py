@@ -167,7 +167,7 @@ class Stick(SerialComChannel):
                 if not issubclass(resp.__class__, PlugwiseAckResponse):
                     #Could be an Ack or AckMac or AcqAssociation error code response when same seqnr
                     try:
-                        error("TEST: %s", (str(reason)[-4:],))
+                        error("TEST: %s" % (str(reason)[-4:],))
                         if (len(msg) == 22 and msg[0:1] == b'\x05') or (len(msg) == 23 and msg[0:1] == b'\x83'):
                             ackresp = PlugwiseAckResponse()
                             ackresp.unserialize(msg)
@@ -181,11 +181,11 @@ class Stick(SerialComChannel):
                         elif str(reason)[-4:] == "0006":
                             ackresp = PlugwiseAdvertiseNodeResponse()
                             ackresp.unserialize(msg)
-                            info("unknown advertise MAC %s", str(ackresp.mac))
+                            info("unknown advertise MAC %s" % str(ackresp.mac))
                         elif str(reason)[-4:] == "0061":
                             ackresp = PlugwiseAckAssociationResponse()
                             ackresp.unserialize(msg)
-                            info("unknown MAC associating %s", str(ackresp.mac))
+                            info("unknown MAC associating %s" % str(ackresp.mac))
                         else:
                             #it does not appear to be a proper Ack message
                             #just retry to read next message
