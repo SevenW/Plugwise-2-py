@@ -378,7 +378,7 @@ class PlugwiseAckResponse(PlugwiseResponse):
         try:
             PlugwiseResponse.unserialize(self, response)
         except UnexpectedResponse as reason:
-            if self.function_code not is None and self.function_code in ['0006', '0061']:
+            if self.function_code != None and self.function_code in ['0006', '0061']:
                 raise
             elif self.expected_command_counter is None:
                 #In case of awaiting an Ack without knowing a seqnr, the most likely reason of
