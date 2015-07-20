@@ -80,8 +80,8 @@ def log_level(level=logging.DEBUG):
     pw_logger.setLevel(level)
 
 def log_comm(enable):
+    global LOG_COMMUNICATION
     LOG_COMMUNICATION = enable
-    info("COMMU log_comm enable %s LOG_COMMU %s" % (enable, LOG_COMMUNICATION))
 
 def debug(msg):
     #if __debug__ and DEBUG_PROTOCOL:
@@ -120,7 +120,6 @@ def logcomm(msg):
     if LOG_COMMUNICATION:
         #logcommfile.write("%s %s \n" % (datetime.datetime.now().isoformat(), msg,))
         pw_comm_logger.info(msg)
-        info("COMMU called logcomm")
 
 class SerialComChannel(object):
     """simple wrapper around serial module"""
