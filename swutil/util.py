@@ -118,6 +118,7 @@ def logcomm(msg):
     if LOG_COMMUNICATION:
         #logcommfile.write("%s %s \n" % (datetime.datetime.now().isoformat(), msg,))
         pw_comm_logger.info(msg)
+        info("COMMU called logcomm")
 
 class SerialComChannel(object):
     """simple wrapper around serial module"""
