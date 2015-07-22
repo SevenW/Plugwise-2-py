@@ -53,6 +53,7 @@ class Stick(SerialComChannel):
 
     def __init__(self, port=0, timeout=DEFAULT_TIMEOUT):
         SerialComChannel.__init__(self, port=port, timeout=timeout)
+        self.unjoined = set()
         self.init()
 
     def init(self):
@@ -203,6 +204,8 @@ class Stick(SerialComChannel):
                             ackresp = PlugwiseAdvertiseNodeResponse()
                             ackresp.unserialize(msg)
                             info("unknown advertise MAC %s" % str(ackresp.mac))
+                            if node not in self.unjoined:
+                                self.unjoined.add(node)
                         elif resp.function_code == "0061":
                             ackresp = PlugwiseAckAssociationResponse()
                             ackresp.unserialize(msg)
@@ -305,6 +308,7 @@ class Circle(object):
         self.scheduleCRC = None
         self.schedule = None
         
+        self.joined = False
         self.online = False
         self.initialized = False
         self.relay_state = '?'

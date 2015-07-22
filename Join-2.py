@@ -1141,18 +1141,19 @@ class PWControl(object):
         print self.circles[0].read_node_table()
 
         
-    def connect_unknown_node(self, newnodemac):
-        #NOTE: Not implemented
-        print "Not implemented"
-        print "Aborting. Remove next line to continue"
-        krak
-        #Basically the flow is the same as in self.connect_node_by_mac(),
-        #except that now the mac-id of the new node needs to be extracted from
-        #the 0006 messages from the node.
-        #handling of this is not yet in the api module.
-        #a listen method should be added for 0006 messages, which may just result
-        #in a timeout when not received.
-        
+    def connect_unknown_nodes(self):
+        for newnodemac in self.device.unjoined:
+            newnode = None
+            try:
+                newnode = self.circles[self.bymac[newnodemac]]
+            except:
+                info("connect_unknown_node: not joining node with MAC %s: not in configuration" % (newnodemac,))        
+            #accept or reject join based on occurence in pw-conf.json
+            self.device.join_node(newnodemac, newNode != None)
+            #clear the list
+            self.device.unjoined.discard(newnodemac)
+        #a later call to self.test_offline will initialize the new circle(s)
+        #self.test_offline()
         
     def run(self):
         global mqtt
@@ -1240,15 +1241,11 @@ class PWControl(object):
             if minute % 15 == 0 and now.second > 8:
                 self.get_relays()
                 
-            #call for unconnected circles. Should invoke 0006
-            #if 0006 seen, should respond with 0007
-            if minute % 10 == 6 and now.second > 8:
-                self.device.enable_joining(True)
-            
-            #close call for unconnected circles.
-            if minute % 10 == 9 and now.second > 8:
-                self.device.enable_joining(False)
-            
+            #add configured unjoined nodes every minute.
+            #although call is issued every hour
+            if minute != prev_minute:
+                self.connect_unknown_nodes()
+                
             if day != prev_day:
                 self.setup_actfiles()
             self.ten_seconds()
