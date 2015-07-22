@@ -1199,7 +1199,7 @@ class PWControl(object):
                     circleplus = c
             except:
                 pass
-        if circleplus != None
+        if circleplus != None:
             debug("joined node table: %s" % (circleplus.read_node_table(),))
       
         #Inform network that nodes are allowed to join the network
