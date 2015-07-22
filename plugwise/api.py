@@ -204,8 +204,8 @@ class Stick(SerialComChannel):
                             ackresp = PlugwiseAdvertiseNodeResponse()
                             ackresp.unserialize(msg)
                             info("unknown advertise MAC %s" % str(ackresp.mac))
-                            if node not in self.unjoined:
-                                self.unjoined.add(node)
+                            if ackresp.mac not in self.unjoined:
+                                self.unjoined.add(ackresp.mac)
                         elif resp.function_code == "0061":
                             ackresp = PlugwiseAckAssociationResponse()
                             ackresp.unserialize(msg)
