@@ -1150,8 +1150,8 @@ class PWControl(object):
                 info("connect_unknown_node: not joining node with MAC %s: not in configuration" % (newnodemac,))        
             #accept or reject join based on occurence in pw-conf.json
             self.device.join_node(newnodemac, newnode != None)
-            #clear the list
-            self.device.unjoined.discard(newnodemac)
+        #clear the list
+        self.device.unjoined.clear()
         #a later call to self.test_offline will initialize the new circle(s)
         #self.test_offline()
         
