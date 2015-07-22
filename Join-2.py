@@ -1191,9 +1191,11 @@ class PWControl(object):
         # except:
             # pass
             
-        print self.circles[0].get_info()
-        print self.circles[1].get_info()
-        print self.circles[0].read_node_table()
+        circleplus = None
+        for c in self.circles:
+            if c.get_info()['type'] == 'circle+':
+                circleplus = circle
+        print circleplus.read_node_table()
       
         #Inform network that nodes are allowed to join the network
         #Nodes may start advertising themselves with a 0006 message.
