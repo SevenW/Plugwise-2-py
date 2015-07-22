@@ -1194,7 +1194,7 @@ class PWControl(object):
         circleplus = None
         for c in self.circles:
             if c.get_info()['type'] == 'circle+':
-                circleplus = circle
+                circleplus = c
         print circleplus.read_node_table()
       
         #Inform network that nodes are allowed to join the network
