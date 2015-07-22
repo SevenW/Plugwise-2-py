@@ -1191,6 +1191,8 @@ class PWControl(object):
         # except:
             # pass
             
+        print self.circles[0].get_info()
+        print self.circles[1].get_info()
         print self.circles[0].read_node_table()
       
         #Inform network that nodes are allowed to join the network
@@ -1235,6 +1237,15 @@ class PWControl(object):
             #get relays state just after each new quarter hour for circles operating a schedule.
             if minute % 15 == 0 and now.second > 8:
                 self.get_relays()
+                
+            #call for unconnected circles. Should invoke 0006
+            #if 0006 seen, should respond with 0007
+            if minute % 10 == 6 and now.second > 8:
+                self.device.enable_joining(True)
+            
+            #close call for unconnected circles.
+            if minute % 10 == 9 and now.second > 8:
+                self.device.enable_joining(False)
             
             if day != prev_day:
                 self.setup_actfiles()
