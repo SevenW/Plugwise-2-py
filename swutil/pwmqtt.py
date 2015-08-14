@@ -23,6 +23,7 @@ class Mqtt_client(object):
         self.name = name+str(os.getpid())
         self.user = user
         self.password = password
+        self.subscriptions = {}
         
         self.connect()
         debug("MQTT init done")
@@ -78,14 +79,26 @@ class Mqtt_client(object):
             #attempt to reconnect
             time.sleep(5)
             self.rc = self._connect()
+            if self.connected():
+                for subscr in self.subscriptions.items():
+                    self.mqttc.subscribe(subscr[0], subscr[1])
+                    info("MQTT subscribed to %s with qos %d" % (subscr[0], subscr[1]))
+                
        
     def subscribe(self, topic, qos=0):
+        self.subscriptions[topic] = qos
         if self.connected():
             self.mqttc.subscribe(topic, qos)
-            info("MQTT subscribed to %s" % topic)
+            info("MQTT subscribed to %s with qos %d" % (topic, qos))
+
+    def unsubscribe(self, topic):
+        self.subscriptions.pop(topic, None)
+        if self.connected():
+            self.mqttc.unsubscribe(topic)
+            info("MQTT unsubscribed from %s" % topic)
 
     def on_message(self, client, userdata, message):
-        debug("MQTT " + message.topic+" "+str(message.payload))
+        #debug("MQTT " + message.topic+" "+str(message.payload))
         self.qsub.put((message.topic, str(message.payload)))
 
     def on_connect(self, client, userdata, flags, rc):
@@ -104,6 +117,9 @@ class Mqtt_client(object):
 
     def on_subscribe(self, client, userdata, mid, granted_qos):
         info("MQTT Subscribed: "+str(mid)+" "+str(granted_qos))
+
+    def on_unsubscribe(self, client, userdata, mid):
+        info("MQTT Unsubscribed: "+str(mid))
 
     # def on_log(self, client, userdata, level, buf):
         # info(buf)
