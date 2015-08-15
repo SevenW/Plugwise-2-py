@@ -59,7 +59,7 @@ def jsondefault(o):
     return o.__dict__
 
 #DEBUG_PROTOCOL = False
-#LOG_COMMUNICATION = True
+log_comm(True)
 #LOG_LEVEL = 2
 
 schedules_path = "config/schedules"
@@ -739,7 +739,7 @@ class PWControl(object):
         return str("plugwise2py/state/" + keyword +"/" + mac)
 
     def publish_circle_state(self, mac):
-        qpub.put((self.ftopic("circle", mac), str(self.get_status_json(mac))))
+        qpub.put((self.ftopic("circle", mac), str(self.get_status_json(mac)), True))
 
     def write_control_file(self):
         #write control file for testing purposes
@@ -778,7 +778,7 @@ class PWControl(object):
                 self.curfile.write("%s, %.2f\n" % (mac, usage))
                 #debug("MQTT put value in qpub")
                 msg = str('{"typ":"pwpower","ts":%d,"mac":"%s","power":%.2f}' % (ts, mac, usage))
-                qpub.put((self.ftopic("power", mac), msg))
+                qpub.put((self.ftopic("power", mac), msg, True))
             except ValueError:
                 #print("%5d, " % (ts,))
                 f.write("%5d, \n" % (ts,))
@@ -996,7 +996,7 @@ class PWControl(object):
                     f.write("%s, %s, %s\n" % (ts_str, watt, watt_hour))
                     #debug("MQTT put value in qpub")
                     msg = str('{"typ":"pwenergy","ts":%s,"mac":"%s","power":%s,"energy":%s,"interval":%d}' % (ts_str, mac, watt.strip(), watt_hour.strip(),c.interval))
-                    qpub.put((self.ftopic("energy", mac), msg))
+                    qpub.put((self.ftopic("energy", mac), msg, True))
             if not f == None:
                 f.close()
                 
@@ -1154,6 +1154,7 @@ class PWControl(object):
         self.device.unjoined.clear()
         #a later call to self.test_offline will initialize the new circle(s)
         #self.test_offline()
+
         
     def run(self):
         global mqtt
@@ -1206,7 +1207,6 @@ class PWControl(object):
         #Nodes may start advertising themselves with a 0006 message.
         self.device.enable_joining(True)   
 
-            
         logrecs = True
         while 1:
             #check whether user defined configuration has been changed
@@ -1249,8 +1249,8 @@ class PWControl(object):
             #although call is issued every hour
             if minute != prev_minute:
                 self.connect_unknown_nodes()
-                
-            if day != prev_day:
+
+                if day != prev_day:
                 self.setup_actfiles()
             self.ten_seconds()
             self.log_status()
@@ -1305,6 +1305,7 @@ class PWControl(object):
 init_logger(logpath+"pw-logger.log", "pw-logger")
 log_level(logging.DEBUG)
 log_comm(True)
+
 try:
     qpub = Queue.Queue()
     qsub = Queue.Queue()

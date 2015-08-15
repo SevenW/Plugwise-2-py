@@ -81,7 +81,9 @@ except:
 qpub = Queue.Queue()
 qsub = Queue.Queue()
 broadcast = []
-bcmutex = threading.Lock()
+last_topics = {}
+
+#bcmutex = threading.Lock()
 mqtt_t = None
 if  not mqtt:
     error("No MQTT python binding installed (mosquitto-python)")
@@ -120,11 +122,12 @@ def broadcaster():
             rcv = qsub.get()
             topic = rcv[0]
             payl = rcv[1]
-            debug("process_mqtt_commands: %s %s" % (topic, payl)) 
-            bcmutex.acquire()
+            #debug("mqtt broadcaster: %s %s" % (topic, payl)) 
+            #bcmutex.acquire()
+            last_topics[topic] = payl
             for bq in broadcast:
                 bq.put(rcv)
-            bcmutex.release()
+            #bcmutex.release()
         time.sleep(0.1)
         
 bc_t = threading.Thread(target=broadcaster)
@@ -135,7 +138,10 @@ info("Broadcast thread started")
  
 class PW2PYwebHandler(HTTPWebSocketsHandler):
     def log_message(self, format, *args):
-        debug(self.address_string()+' '+format % args)
+        if not args:
+            debug(self.address_string()+' '+format)
+        else:
+            debug(self.address_string()+' '+format % args)
 
     def log_error(self, format, *args):
         error(self.address_string()+' '+format % args)
@@ -149,7 +155,7 @@ class PW2PYwebHandler(HTTPWebSocketsHandler):
         HTTPWebSocketsHandler.end_headers(self)
 
     def do_GET(self):
-        #self.log_message("PW2PYwebHandler do_GET")
+        self.log_message("PW2PYwebHandler do_GET")
         #debug("GET " + self.path)
         if self.path in ['', '/', '/index']:
             self.path = '/index.html'
@@ -178,7 +184,7 @@ class PW2PYwebHandler(HTTPWebSocketsHandler):
 
 
     def do_POST(self):
-        #self.log_message("PW2PYwebHandler do_POST")
+        self.log_message("PW2PYwebHandler do_POST")
         #self.logRequest()
         path = self.path
         ctype, pdict = cgi.parse_header(self.headers.getheader('content-type'))
@@ -285,33 +291,46 @@ class PW2PYwebHandler(HTTPWebSocketsHandler):
 
     def on_ws_connected(self):
         self.q = Queue.Queue()
-        bcmutex.acquire()
-        broadcast.append(self.q)
-        bcmutex.release()
+
+
+
         self.t = threading.Thread(target=self.process_mqtt)
         self.t.daemon = True
         self.t.start()
-        #self.log_message("process_mqtt running on worker thread %d" % self.t.ident)
+        
+        #bcmutex.acquire()
+        broadcast.append(self.q)
+        #bcmutex.release()
+        self.log_message("process_mqtt running on worker thread %d" % self.t.ident)
 
     def on_ws_closed(self):
-        bcmutex.acquire()
+        #bcmutex.acquire()
         broadcast.remove(self.q)
-        bcmutex.release()
+        #bcmutex.release()
         #join gives issues. threads seems to be reused, so threads end anyways.
         #self.t.join()
         #self.log_message("on_ws_closed websocket closed for handler %s" % str(self))
         
     def process_mqtt(self):
+        #allow some time for websockets to become fully operational
+        time.sleep(2.0)
+        #send last known state to webpage
+        topics = last_topics.items()
+        for topic in topics:
+            self.q.put(topic)
         while self.connected:
             while not self.q.empty():
                 rcv = self.q.get()
                 topic = rcv[0]
                 payl = rcv[1]
-                #info("process_mqtt_commands: %s %s" % (topic, payl)) 
+                info("process_mqtt_commands: %s %s" % (topic, payl)) 
                 if self.connected:
                     self.send_message(payl)
             time.sleep(0.5)
-    
+
+        self.log_message("process_mqtt exiting worker thread %d" % self.t.ident)
+
+        
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     """Handle requests in a separate thread."""
  

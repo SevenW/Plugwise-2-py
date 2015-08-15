@@ -59,7 +59,6 @@ def jsondefault(o):
     return o.__dict__
 
 #DEBUG_PROTOCOL = False
-#LOG_COMMUNICATION = True
 log_comm(True)
 #LOG_LEVEL = 2
 
@@ -738,7 +737,7 @@ class PWControl(object):
         return str("plugwise2py/state/" + keyword +"/" + mac)
 
     def publish_circle_state(self, mac):
-        qpub.put((self.ftopic("circle", mac), str(self.get_status_json(mac))))
+        qpub.put((self.ftopic("circle", mac), str(self.get_status_json(mac)), True))
 
     def write_control_file(self):
         #write control file for testing purposes
@@ -777,7 +776,7 @@ class PWControl(object):
                 self.curfile.write("%s, %.2f\n" % (mac, usage))
                 #debug("MQTT put value in qpub")
                 msg = str('{"typ":"pwpower","ts":%d,"mac":"%s","power":%.2f}' % (ts, mac, usage))
-                qpub.put((self.ftopic("power", mac), msg))
+                qpub.put((self.ftopic("power", mac), msg, True))
             except ValueError:
                 #print("%5d, " % (ts,))
                 f.write("%5d, \n" % (ts,))
@@ -995,7 +994,7 @@ class PWControl(object):
                     f.write("%s, %s, %s\n" % (ts_str, watt, watt_hour))
                     #debug("MQTT put value in qpub")
                     msg = str('{"typ":"pwenergy","ts":%s,"mac":"%s","power":%s,"energy":%s,"interval":%d}' % (ts_str, mac, watt.strip(), watt_hour.strip(),c.interval))
-                    qpub.put((self.ftopic("energy", mac), msg))
+                    qpub.put((self.ftopic("energy", mac), msg, True))
             if not f == None:
                 f.close()
                 
@@ -1140,18 +1139,19 @@ class PWControl(object):
         print self.circles[0].read_node_table()
 
         
-    def connect_unknown_node(self, newnodemac):
-        #NOTE: Not implemented
-        print "Not implemented"
-        print "Aborting. Remove next line to continue"
-        krak
-        #Basically the flow is the same as in self.connect_node_by_mac(),
-        #except that now the mac-id of the new node needs to be extracted from
-        #the 0006 messages from the node.
-        #handling of this is not yet in the api module.
-        #a listen method should be added for 0006 messages, which may just result
-        #in a timeout when not received.
-        
+    def connect_unknown_nodes(self):
+        for newnodemac in self.device.unjoined:
+            newnode = None
+            try:
+                newnode = self.circles[self.bymac[newnodemac]]
+            except:
+                info("connect_unknown_node: not joining node with MAC %s: not in configuration" % (newnodemac,))        
+            #accept or reject join based on occurence in pw-conf.json
+            self.device.join_node(newnodemac, newnode != None)
+        #clear the list
+        self.device.unjoined.clear()
+        #a later call to self.test_offline will initialize the new circle(s)
+        #self.test_offline()
         
     def run(self):
         global mqtt
@@ -1190,6 +1190,20 @@ class PWControl(object):
         # except:
             # pass
             
+        circleplus = None
+        for c in self.circles:
+            try:
+                if c.get_info()['type'] == 'circle+':
+                    circleplus = c
+            except:
+                pass
+        if circleplus != None:
+            debug("joined node table: %s" % (circleplus.read_node_table(),))
+      
+        #Inform network that nodes are allowed to join the network
+        #Nodes may start advertising themselves with a 0006 message.
+        self.device.enable_joining(True)   
+
         logrecs = True
         while 1:
             #check whether user defined configuration has been changed
@@ -1227,7 +1241,12 @@ class PWControl(object):
             #get relays state just after each new quarter hour for circles operating a schedule.
             if minute % 15 == 0 and now.second > 8:
                 self.get_relays()
-            
+                
+            #add configured unjoined nodes every minute.
+            #although call is issued every hour
+            if minute != prev_minute:
+                self.connect_unknown_nodes()
+
             if day != prev_day:
                 self.setup_actfiles()
             self.ten_seconds()
@@ -1282,6 +1301,7 @@ class PWControl(object):
 
 init_logger(logpath+"pw-logger.log", "pw-logger")
 log_level(logging.DEBUG)
+
 try:
     qpub = Queue.Queue()
     qsub = Queue.Queue()

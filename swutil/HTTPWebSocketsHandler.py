@@ -32,7 +32,7 @@ class HTTPWebSocketsHandler(SimpleHTTPRequestHandler):
     _opcode_ping = 0x9
     _opcode_pong = 0xa
 
-    mutex = threading.Lock()
+    #mutex = threading.Lock()
     
     def on_ws_message(self, message):
         """Override this handler to process incoming websocket messages."""
@@ -53,25 +53,38 @@ class HTTPWebSocketsHandler(SimpleHTTPRequestHandler):
         SimpleHTTPRequestHandler.setup(self)
         self.connected = False
                 
-    # def finish(self):
-        # #needed when wfile is used, or when self.close_connection is not used
-        # #
-        # #catch errors in SimpleHTTPRequestHandler.finish() after socket disappeared
-        # #due to loss of network connection
-        # try:
-            # SimpleHTTPRequestHandler.finish(self)
-        # except (socket.error, TypeError) as err:
-            # self.log_message("finish(): Exception: in SimpleHTTPRequestHandler.finish(): %s" % str(err.args))
+    def finish(self):
+        #needed when wfile is used, or when self.close_connection is not used
 
-    # def handle(self):
-        # #needed when wfile is used, or when self.close_connection is not used
-        # #
-        # #catch errors in SimpleHTTPRequestHandler.handle() after socket disappeared
-        # #due to loss of network connection
-        # try:
-            # SimpleHTTPRequestHandler.handle(self)
-        # except (socket.error, TypeError) as err:
-            # self.log_message("handle(): Exception: in SimpleHTTPRequestHandler.handle(): %s" % str(err.args))
+        #
+        #catch errors in SimpleHTTPRequestHandler.finish() after socket disappeared
+        #due to loss of network connection
+
+        self.log_message("finish entry on worker thread %d" % threading.current_thread().ident)
+        try:
+            SimpleHTTPRequestHandler.finish(self)
+        except (socket.error, TypeError) as err:
+            self.log_message("finish(): Exception: in SimpleHTTPRequestHandler.finish(): %s" % str(err.args))
+            print("finish(): Exception: in SimpleHTTPRequestHandler.finish(): %s" % str(err.args))
+        self.log_message("finish done on worker thread %d" % threading.current_thread().ident)
+
+    def handle(self):
+        #needed when wfile is used, or when self.close_connection is not used
+
+        #
+        #catch errors in SimpleHTTPRequestHandler.handle() after socket disappeared
+        #due to loss of network connection
+
+        self.log_message("handle entry on worker thread %d" % threading.current_thread().ident)
+        try:
+            SimpleHTTPRequestHandler.handle(self)
+        except (socket.error,) as err:
+            self.log_message("handle(): Exception: in SimpleHTTPRequestHandler.handle(): %s" % str(err.args))
+            print("handle(): Exception: in SimpleHTTPRequestHandler.handle(): %s" % str(err.args))
+        except (TypeError,) as err:
+            self.log_message("handle(): Exception: in SimpleHTTPRequestHandler.handle(): %s" % str(err))
+            print("handle(): Exception: in SimpleHTTPRequestHandler.handle(): %s" % str(err))
+        self.log_message("handle done on worker thread %d" % threading.current_thread().ident)
 
     def checkAuthentication(self):
         auth = self.headers.get('Authorization')
@@ -83,9 +96,20 @@ class HTTPWebSocketsHandler(SimpleHTTPRequestHandler):
         return True
         
     def do_GET(self):
+        #self.log_message("HTTPWebSocketsHandler do_GET")
         if self.server.auth and not self.checkAuthentication():
             return
-        if self.headers.get("Upgrade", None) == "websocket":
+        if self.headers.get("Upgrade", None) and self.headers.get("Upgrade", None).lower().strip() == "websocket":
+            self.log_message("do_GET upgrade: headers:\r\n %s" % (str(self.headers),))
+            #self.log_message("do_GET upgrade: server %s" % (self.server,))
+            #self.log_message("do_GET upgrade: timeout1 %d" % (self.server.socket.gettimeout(),))
+            # if self.server.timeout != None:
+                # self.log_message("do_GET upgrade: timeout2 %d" % (self.server.timeout,))
+            # else:
+                # self.log_message("do_GET upgrade: timeout2 None")
+        
+            #self.server.socket.settimeout(0)
+            
             self._handshake()
             #This handler is in websocket mode now.
             #do_GET only returns after client close or socket error.
@@ -156,7 +180,7 @@ class HTTPWebSocketsHandler(SimpleHTTPRequestHandler):
 
     def _handshake(self):
         headers=self.headers
-        if headers.get("Upgrade", None) != "websocket":
+        if self.headers.get("Upgrade", None) and self.headers.get("Upgrade", None).lower().strip() != "websocket":
             return
         key = headers['Sec-WebSocket-Key']
         digest = b64encode(sha1(key + self._ws_GUID).hexdigest().decode('hex'))
@@ -171,7 +195,9 @@ class HTTPWebSocketsHandler(SimpleHTTPRequestHandler):
     
     def _ws_close(self):
         #avoid closing a single socket two time for send and receive.
-        self.mutex.acquire()
+        #self.log_message("LOCK: WAIT _was_close obj: %s thd %s" % (str(self) , threading.current_thread().ident)) 
+        #self.mutex.acquire()
+        #self.log_message("LOCK: ACKD _was_close obj: %s thd %s" % (str(self) , threading.current_thread().ident)) 
         try:
             if self.connected:
                 self.connected = False
@@ -181,13 +207,16 @@ class HTTPWebSocketsHandler(SimpleHTTPRequestHandler):
                 try: 
                     self._send_close()
                 except:
+                    self.log_message("_ws_close we send a close to a broken line. Do not expect much")
                     pass
                 self.on_ws_closed()
             else:
                 self.log_message("_ws_close websocket in closed state. Ignore.")
                 pass
         finally:
-            self.mutex.release()
+            #self.mutex.release()
+            pass
+        #self.log_message("LOCK: RLSD _was_close obj: %s thd %s" % (str(self) , threading.current_thread().ident)) 
             
     def _on_message(self, message):
         #self.log_message("_on_message: opcode: %02X msg: %s" % (self.opcode, message))
@@ -200,6 +229,7 @@ class HTTPWebSocketsHandler(SimpleHTTPRequestHandler):
             try:
                 self._send_close()
             except:
+                self.log_message("_on_message we send a close to a broken line. Do not expect much")
                 pass
             self.on_ws_closed()
         # ping

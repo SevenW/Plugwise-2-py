@@ -67,10 +67,14 @@ class Mqtt_client(object):
                     data = self.qpub.get()
                     topic = data[0]
                     msg = data[1]
-                    info(topic)
-                    info(msg)
+
+
+                    retain = False;
+                    if len(data)>2:
+                        retain = data[2]
+                    debug("MQTT publish: %s %s retain = %s" % (topic, msg, retain))
                     try:
-                        self.mqttc.publish(topic, msg)
+                        self.mqttc.publish(topic, msg, 0, retain)
                     except Exception as reason:
                         error("MQTT connection error in publish: "+str(reason))
                 time.sleep(0.1)
