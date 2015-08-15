@@ -1250,7 +1250,7 @@ class PWControl(object):
             if minute != prev_minute:
                 self.connect_unknown_nodes()
 
-                if day != prev_day:
+            if day != prev_day:
                 self.setup_actfiles()
             self.ten_seconds()
             self.log_status()
