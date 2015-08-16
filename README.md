@@ -1,7 +1,7 @@
 Plugwise-2-py
 =============
 
-#Key features: 
+#Key features:
 - Web-interface to switch, configure and edit schedules and stand-by killer
 - MQTT interface for control and log meter readings.
 - Log every 10-seconds in monitoring mode.
@@ -52,6 +52,7 @@ git clone https://github.com/SevenW/Plugwise-2-py.git
 cd Plugwise-2-py
 sudo pip install .
 ```
+> Note: include the period "." in the line above!
 
 ##configuration:
 *First time install*
@@ -67,18 +68,22 @@ cp -n config-default/pw-conf.json config/
 
 *configuring server and circles*
 
-In pw-hostconfig.json edit tmp_path, permanent_path, log_path and serial
+In config/pw-hostconfig.json edit tmp_path, permanent_path, log_path and serial
 
-```{"permanent_path": "/home/pi/datalog", "tmp_path": "/tmp", "serial": "/dev/ttyUSB0"}```
+```{"permanent_path": "/home/pi/datalog", "tmp_path": "/tmp", "log_path": "/home/pi/pwlog", "serial": "/dev/ttyUSB0"}```
+
+> Note: For INOF/DEBUG logging, normally /var/log can be used as path. However, on the raspberry pi, only the root user can write in /var/log. Therfore it is better to log to /home/<username>/pwlog
+
+> Note: Editing JSON files is error-prone. Use a JSON Validator such as http://jsonlint.com/ to check the config files.
 
 Edit the proper Circle mac addresses in pw-conf.json and pw-control.json. Make more changes as appropriate to your needs.
 - Enable 10-seconds monitoring: `"monitor": "yes"`
 - Enable logging form Circle internal metering buffers: `"savelog": "yes"`
 
 Note: At first start-up, it starts reading the Circle internal metering buffers form position zero up to the current time. Worst case it can read for three years worth of readings. This may take form several minutes to several hours.
-Monitor this activity bu tailing the log file:
+Monitor this activity by tailing the log file:
 
-`tail -f /var/log/pw-logger.log`
+`tail -f /home/pi/pwlog/pw-logger.log`
 
 MQTT can be enable by adding two key,values to pw-hostconfig.json
 

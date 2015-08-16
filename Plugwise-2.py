@@ -67,6 +67,10 @@ cfg = json.load(open("config/pw-hostconfig.json"))
 tmppath = cfg['tmp_path']+'/'
 perpath = cfg['permanent_path']+'/'
 logpath = cfg['log_path']+'/'
+#make sure log directory exists
+if not os.path.exists(logpath):
+    os.makedirs(logpath)
+
 port = cfg['serial']
 epochf = False
 if cfg.has_key('log_format') and cfg['log_format'] == 'epoch':
