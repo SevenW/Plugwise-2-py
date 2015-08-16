@@ -11,6 +11,7 @@ Plugwise-2-py
 - Always-on option, cannot be overridden by switch command.
 - Robust matching of commands and replies in Zigbee communication.
 - Openhab interface through MQTT.
+- Domoticz interface through MQTT.
 
 ##Introduction
 Plugwise-2-py evolved in a monitoring and control server for plugwise devices.
@@ -29,7 +30,7 @@ Switching / stand-by killer schedules are defines as json files in the schedules
 
 Changes to pw-control.json and schedules/*.json are automatically picked up by Plugwise-2.py and applied.
 
-pw-control.json and schedules/*.json can be edited with the web applicaiton (see below)
+pw-control.json and schedules/*.json can be edited with the web application (see below)
 
 In the dynamic configuration:
 - logging of the in-circle integrated values can be enabled (usually the one-value-per-hour loggings.
@@ -72,7 +73,7 @@ In config/pw-hostconfig.json edit tmp_path, permanent_path, log_path and serial
 
 ```{"permanent_path": "/home/pi/datalog", "tmp_path": "/tmp", "log_path": "/home/pi/pwlog", "serial": "/dev/ttyUSB0"}```
 
-> Note: For INOF/DEBUG logging, normally /var/log can be used as path. However, on the raspberry pi, only the root user can write in /var/log. Therfore it is better to log to /home/<username>/pwlog
+> Note: For INFO/DEBUG logging, normally /var/log can be used as path. However, on the raspberry pi, only the root user can write in /var/log. Therefore it is better to log to /home/<username>/pwlog
 
 > Note: Editing JSON files is error-prone. Use a JSON Validator such as http://jsonlint.com/ to check the config files.
 
@@ -110,9 +111,17 @@ the log level can be programmed in pw-control.json. Changes are picked up latest
 
 log_comm results in logging to  pw-communications.log, in the log folder specified through log_path in pw-hostconfig.json
 
+Update from github
+------------------
+```shell
+#from Plugwise-2-py folder:
+git pull
+sudo pip install --upgrade .
+```
+
 Web interface
 -------------
-Plugwise-2-py can be operated through a web interfaces. The packages comes with its own dedicated webserver also written in python. It makes use of websockets for efficient and unsolicited communication.
+Plugwise-2-py can be operated through a web interfaces. The packages comes with its own dedicated web-server also written in python. It makes use of websockets for efficient and unsolicited communication.
 ##setup
 
 ```shell
@@ -218,3 +227,9 @@ Openhab can communicate with Plugwise-2-py through a MQTT server. Openhab provid
 TODO: Add a description.
 Example sitemap, items, rules and transforms can be found in the openhab folder in this repository
 
+Domoticz
+--------
+A MQTT to HTTP commands interface (using Node-Red) has been developed:
+https://www.domoticz.com/forum/viewtopic.php?f=14&t=7420&sid=22502c728a9a4f7d5ac93e6f5c0642a9
+
+I am investigating a more direct MQTT to Domoticz interface currently. 
