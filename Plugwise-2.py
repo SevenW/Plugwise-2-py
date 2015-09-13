@@ -1206,7 +1206,10 @@ class PWControl(object):
       
         #Inform network that nodes are allowed to join the network
         #Nodes may start advertising themselves with a 0006 message.
-        self.device.enable_joining(True)   
+        try:
+            self.device.enable_joining(True)
+        except:
+            error("PWControl.run(): Communication error in enable_joining")
 
         logrecs = True
         while 1:
