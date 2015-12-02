@@ -314,6 +314,7 @@ class Circle(object):
         self.relay_state = '?'
         self.switch_state = '?'
         self.schedule_state = '?'
+        self.requid = 'unset'
         if self.attr['always_on'] != 'False':
             #self.relay_state = 'on'
             self.schedule_state = 'off'
@@ -354,6 +355,7 @@ class Circle(object):
         retd["switch"] = self.relay_state
         retd["switchreq"] = self.switch_state
         retd["schedule"] = self.schedule_state
+        retd["requid"] = self.requid
         if self.schedule != None:
             retd["schedname"] = self.schedule.name
         else:

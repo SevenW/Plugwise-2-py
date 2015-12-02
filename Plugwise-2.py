@@ -403,9 +403,10 @@ class PWControl(object):
         c = self.circles[self.bymac[mac]]
         debug('circle mac: %s before1 - state [r,sw,sc] %s %s %s - scname %s' % (mac, c.relay_state, control['switch_state'], control['schedule_state'], control['schedule']))
         debug('circle mac: %s before2 - state [r,sw,sc] %s %s %s' % (c.mac, c.relay_state, c.switch_state, c.schedule_state))
-        updated = updated | self.apply_schedstate_to_circle(control, mac, force)
+        source = "internal"
+        updated = updated | self.apply_schedstate_to_circle(control, mac, source, force)
         if control['schedule_state'] != 'on':
-            updated = updated | self.apply_switch_to_circle(control, mac, force)
+            updated = updated | self.apply_switch_to_circle(control, mac, source, force)
         else:
             #prime the switch state for consistency between circle and control
             try:
@@ -488,7 +489,7 @@ class PWControl(object):
                 error("schedule name from controls '%s' not found in table of schedules" % (schedname,))
         return circle_changed
                                     
-    def apply_switch_to_circle(self, control, mac, force=False):
+    def apply_switch_to_circle(self, control, mac, source, force=False):
         """apply control settings to circle
         in case of a communication problem, c.online is set to False by api
         self.test_offline() will apply the control settings again by calling this function
@@ -501,6 +502,8 @@ class PWControl(object):
         if not c.online:
             return False
         switched = False
+        c.requid = source
+
         #switch on/off if required
         sw_state = control['switch_state'].lower()
         if sw_state == 'on' or sw_state == 'off':
@@ -517,7 +520,7 @@ class PWControl(object):
             error('invalid switch_state value in controls file')
         return switched
 
-    def apply_schedstate_to_circle(self, control, mac, force=False):
+    def apply_schedstate_to_circle(self, control, mac, source, force=False):
         """apply control settings to circle
         in case of a communication problem, c.online is set to False by api
         self.test_offline() will apply the control settings again by calling this function
@@ -531,6 +534,7 @@ class PWControl(object):
             print "offline"
             return False
         switched = False
+        c.requid = source
         
         #force schedule_state to off when no schedule is defined
         if ((not control['schedule']) or control['schedule'] == "") and control['schedule_state'].lower() == 'on':
@@ -701,6 +705,10 @@ class PWControl(object):
                 msg = json.loads(payl)
                 control = self.controls[self.controlsbymac[mac]]
                 val = msg['val']
+                try:
+                    source = msg['uid']
+                except: #KeyError:
+                    source = "anonymous_mqtt"
             except:
                 error("MQTT: Invalid message format in topic or JSON payload")
                 continue
@@ -708,7 +716,7 @@ class PWControl(object):
                 val = val.lower()
                 if val == "on" or val == "off":
                     control['switch_state'] = val
-                    updated = self.apply_switch_to_circle(control, mac)
+                    updated = self.apply_switch_to_circle(control, mac, source)
                     #switch command overrides schedule_state setting
                     control['schedule_state'] = "off"
                 else:
@@ -717,7 +725,7 @@ class PWControl(object):
                 val = val.lower()
                 if val == "on" or val == "off":
                     control['schedule_state'] = val
-                    updated = self.apply_schedstate_to_circle(control, mac)
+                    updated = self.apply_schedstate_to_circle(control, mac, source)
                 else:
                     error("MQTT command has invalid value %s" % (val,))
             elif cmd == "setsched":
