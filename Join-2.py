@@ -67,10 +67,6 @@ cfg = json.load(open("config/pw-hostconfig.json"))
 tmppath = cfg['tmp_path']+'/'
 perpath = cfg['permanent_path']+'/'
 logpath = cfg['log_path']+'/'
-#make sure log directory exists
-if not os.path.exists(logpath):
-    os.makedirs(logpath)
-
 port = cfg['serial']
 epochf = False
 if cfg.has_key('log_format') and cfg['log_format'] == 'epoch':
@@ -377,13 +373,15 @@ class PWControl(object):
             i += 1
         #set log settings
         if controls.has_key('log_comm'):
-            log_comm(controls['log_comm'].strip().lower() == 'yes')
+            log_comm(str(controls['log_comm']).strip().lower() == 'yes')
+            info("COMMU with str() %s" % (str(controls['log_comm']).strip().lower() == 'yes',))
+            info("COMMU with u %s" % (controls['log_comm'].strip().lower() == 'yes',))
         if controls.has_key('log_level'):
-            if controls['log_level'].strip().lower() == 'debug':
+            if str(controls['log_level']).strip().lower() == 'debug':
                 log_level(logging.DEBUG)
-            elif controls['log_level'].strip().lower() == 'info':
+            elif str(controls['log_level']).strip().lower() == 'info':
                 log_level(logging.INFO)
-            elif controls['log_level'].strip().lower() == 'error':
+            elif str(controls['log_level']).strip().lower() == 'error':
                 log_level(logging.ERROR)
             else:
                 log_level(logging.INFO)
@@ -1156,6 +1154,7 @@ class PWControl(object):
         self.device.unjoined.clear()
         #a later call to self.test_offline will initialize the new circle(s)
         #self.test_offline()
+
         
     def run(self):
         global mqtt
@@ -1206,10 +1205,7 @@ class PWControl(object):
       
         #Inform network that nodes are allowed to join the network
         #Nodes may start advertising themselves with a 0006 message.
-        try:
-            self.device.enable_joining(True)
-        except:
-            error("PWControl.run(): Communication error in enable_joining")
+        self.device.enable_joining(True)   
 
         logrecs = True
         while 1:
@@ -1308,6 +1304,7 @@ class PWControl(object):
 
 init_logger(logpath+"pw-logger.log", "pw-logger")
 log_level(logging.DEBUG)
+log_comm(True)
 
 try:
     qpub = Queue.Queue()

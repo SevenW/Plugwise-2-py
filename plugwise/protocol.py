@@ -1,4 +1,4 @@
-# Copyright (C) 2012,2013,2014 Seven Watt <info@sevenwatt.com>
+# Copyright (C) 2012,2013,2014,2015 Seven Watt <info@sevenwatt.com>
 # <http://www.sevenwatt.com>
 #
 # This file is part of Plugwise-2-py.
@@ -24,9 +24,9 @@
 import struct
 import binascii
 import datetime
-
 from .exceptions import *
-from .util import *
+
+from swutil.util import *
 
 DEBUG_PROTOCOL = False
 
@@ -269,6 +269,7 @@ class PlugwiseResponse(PlugwiseMessage):
         self.params = []
 
         self.mac = None
+        self.function_code = None
         self.command_counter = None
         self.expected_command_counter = seqnr
 
@@ -283,7 +284,7 @@ class PlugwiseResponse(PlugwiseMessage):
             response = response[1:]
             header5 = True
                 
-        header, function_code, self.command_counter = struct.unpack("4s4s4s", response[:12])
+        header, self.function_code, self.command_counter = struct.unpack("4s4s4s", response[:12])
         crc, footer = struct.unpack("4s2s", response[-6:])
         raw_msg_len = len(response)
         
@@ -303,22 +304,25 @@ class PlugwiseResponse(PlugwiseMessage):
                 header = '--->'
         if crc != self.calculate_checksum(response[4:-6]):
             protocol_error = "checksum error!"
-        debug("STRU      "+repr(header)+" "+repr(function_code)+" "+repr(self.command_counter)+" <data> "+repr(crc)+" "+repr(footer))
+        debug("STRU      "+repr(header)+" "+repr(self.function_code)+" "+repr(self.command_counter)+" <data> "+repr(crc)+" "+repr(footer))
         if len(protocol_error) > 0:
             raise ProtocolError(protocol_error)
             
             
-        if function_code in ['0000', '0002', '0003', '0005']:
+        if self.function_code in ['0000', '0002', '0003', '0005']:
             response = response[12:-6]
         else:
             self.mac = response[12:28]
             response = response[28:-6]
         debug("DATA %4d %s" % (len(response), repr(response)))
-
+        
+        if self.function_code in ['0006', '0061']:
+            error("response.unserialize: detected %s expected %s" % (self.function_code, self.ID))
+        
+        if self.ID != 'FFFF' and self.function_code != self.ID:
+            raise UnexpectedResponse("expected response code %s, received code %s" % (self.ID, self.function_code))
         if self.expected_command_counter != None and self.expected_command_counter != self.command_counter:
             raise OutOfSequenceException("expected seqnr %s, received seqnr %s - this may be a duplicate message" % (self.expected_command_counter, self.command_counter))
-        if self.ID != 'FFFF' and function_code != self.ID:
-            raise UnexpectedResponse("expected response code %s, received code %s" % (self.ID, function_code))
         if raw_msg_len != len(self):
             raise UnexpectedResponse("response doesn't have expected length. expected %d bytes got %d" % (len(self), raw_msg_len))
         
@@ -327,7 +331,7 @@ class PlugwiseResponse(PlugwiseMessage):
             logmac = '................'
         else:
             logmac = self.mac
-        if function_code in ['0000', '0003', '0005']:
+        if self.function_code in ['0000', '0003', '0005']:
             #HACK: retrieve info from Acq and AcqMac responses
             respstatus = response[:4]
             logresp = ''
@@ -336,8 +340,8 @@ class PlugwiseResponse(PlugwiseMessage):
         else:
             respstatus = '....'
             logresp = response
-        logcomm("RECV %4d %s %4s %4s %4s %16s %s %4s %s" % (raw_msg_len, header, function_code, self.command_counter, respstatus, logmac, logresp, crc, footer))
-        #logcomm("RECV      "+repr(header)+" "+repr(function_code)+" "+repr(self.command_counter)+" <data> "+repr(crc)+" "+repr(footer))
+        logcomm("RECV %4d %s %4s %4s %4s %16s %s %4s %s" % (raw_msg_len, header, self.function_code, self.command_counter, respstatus, logmac, logresp, crc, footer))
+        #logcomm("RECV      "+repr(header)+" "+repr(self.function_code)+" "+repr(self.command_counter)+" <data> "+repr(crc)+" "+repr(footer))
         
         # FIXME: check function code match
         response = self._parse_params(response)
@@ -374,7 +378,9 @@ class PlugwiseAckResponse(PlugwiseResponse):
         try:
             PlugwiseResponse.unserialize(self, response)
         except UnexpectedResponse as reason:
-            if self.expected_command_counter is None:
+            if self.function_code != None and self.function_code in ['0006', '0061']:
+                raise
+            elif self.expected_command_counter is None:
                 #In case of awaiting an Ack without knowing a seqnr, the most likely reason of
                 #an UnexpectedResponse is a duplicate (ghost) response from an older SEND request.
                 raise OutOfSequenceException("expected command ack from stick. received message with seqnr %s - this may be a duplicate message" % (self.command_counter,))
@@ -538,7 +544,7 @@ class PlugwisePingResponse(PlugwiseResponse):
         self.pingtime = Int(0, 4)
         self.params += [self.qin, self.qout, self.pingtime]
               
-class PlugwisePopulateResponse(PlugwiseResponse):
+class PlugwiseAssociatedNodesResponse(PlugwiseResponse):
     ID = b'0019'
 
     def __init__(self, seqnr = None):
@@ -552,8 +558,6 @@ class PlugwiseAdvertiseNodeResponse(PlugwiseResponse):
 
     def __init__(self, seqnr = None):
         PlugwiseResponse.__init__(self, seqnr)
-        self.node_mac_id = String(None, length=16)
-        self.params += [self.node_mac_id]
               
 class PlugwiseQueryCirclePlusResponse(PlugwiseResponse):
     ID = b'0002'
@@ -610,7 +614,14 @@ class PlugwiseRemoveNodeResponse(PlugwiseResponse):
         PlugwiseResponse.__init__(self, seqnr)
         self.node_mac_id = String(None, length=16)
         self.status = Int(0, 2)
-        self.params += [self.node_mac_id, self.status]              
+        self.params += [self.node_mac_id, self.status]  
+
+class PlugwiseAckAssociationResponse(PlugwiseResponse):
+    ID = b'0061'
+
+    def __init__(self, seqnr = None):
+        #sequence number is always FFFD
+        PlugwiseResponse.__init__(self, 0xFFFD)       
         
 class PlugwiseRequest(PlugwiseMessage):
     def __init__(self, mac):
@@ -748,7 +759,7 @@ class PlugwisePingRequest(PlugwiseRequest):
     def __init__(self, mac):
         PlugwiseRequest.__init__(self, mac)
 
-class PlugwisePopulateRequest(PlugwiseRequest):
+class PlugwiseAssociatedNodesRequest(PlugwiseRequest):
     """Send populate request"""
     ID = b'0018'
     
@@ -817,7 +828,7 @@ class PlugwiseConnectCirclePlusRequest(PlugwiseRequest):
         return full_msg
     
 class PlugwiseRemoveNodeRequest(PlugwiseRequest):
-    """Send populate request"""
+    """Send remove node from network request"""
     ID = b'001C'
     
     def __init__(self, mac, removemac):
@@ -825,7 +836,7 @@ class PlugwiseRemoveNodeRequest(PlugwiseRequest):
         self.args.append(String(removemac, length=16))
 
 class PlugwiseResetRequest(PlugwiseRequest):
-    """Send populate request"""
+    """Send preset circle request"""
     ID = b'0009'
     
     def __init__(self, mac, moduletype, timeout):

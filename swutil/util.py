@@ -1,4 +1,4 @@
-# Copyright (C) 2012,2013,2014 Seven Watt <info@sevenwatt.com>
+# Copyright (C) 2012,2013,2014,2015 Seven Watt <info@sevenwatt.com>
 # <http://www.sevenwatt.com>
 #
 # This file is part of Plugwise-2-py.
@@ -23,7 +23,6 @@
 
 import sys
 import serial
-#from datetime import datetime
 import datetime
 import logging
 import logging.handlers
@@ -33,9 +32,6 @@ LOG_COMMUNICATION = False
 #global var
 pw_logger = None
 pw_comm_logger = None
-
-
-
 
 def _string_convert_py3(s):
     if type(s) == type(b''):
@@ -82,6 +78,10 @@ def init_logger(logfname, appname='plugwise2py'):
    
 def log_level(level=logging.DEBUG):
     pw_logger.setLevel(level)
+
+def log_comm(enable):
+    global LOG_COMMUNICATION
+    LOG_COMMUNICATION = enable
 
 def debug(msg):
     #if __debug__ and DEBUG_PROTOCOL:

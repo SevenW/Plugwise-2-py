@@ -1,15 +1,10 @@
-# Local configuration files
-my_*
-
 # Folders
-/logger
-/dist
-/build
-/plugwise2py.egg-info
+/nongit
 
 #misc
-plugwise/mosquitto.py
-ez_setup.py
+get-pip.py
+config/*.json
 *.pyc
 *.log
-
+*.out
+*.pem

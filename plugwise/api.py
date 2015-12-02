@@ -1,6 +1,6 @@
 #!/bin/env python
 
-# Copyright (C) 2012,2013,2014 Seven Watt <info@sevenwatt.com>
+# Copyright (C) 2012,2013,2014,2015 Seven Watt <info@sevenwatt.com>
 # <http://www.sevenwatt.com>
 #
 # This file is part of Plugwise-2-py.
@@ -37,11 +37,10 @@ import time
 import math
 from datetime import datetime, timedelta
 import calendar
-
 import logging
-
 from serial.serialutil import SerialException
-from .util import *
+
+from swutil.util import *
 from .protocol import *
 from .exceptions import *
 
@@ -54,6 +53,7 @@ class Stick(SerialComChannel):
 
     def __init__(self, port=0, timeout=DEFAULT_TIMEOUT):
         SerialComChannel.__init__(self, port=port, timeout=timeout)
+        self.unjoined = set()
         self.init()
 
     def init(self):
@@ -144,7 +144,7 @@ class Stick(SerialComChannel):
         # expected that we constantly get unexpected messages
         while 1:
             try:
-                readlen = len(resp)
+                #readlen = len(resp)
                 #debug("expecting to read "+str(readlen)+" bytes for msg. "+str(resp))
                 msg = self._recv_response(retry_timeout)
                 resp.unserialize(msg)
@@ -166,7 +166,7 @@ class Stick(SerialComChannel):
                 else:
                     debug("unexpected response [1]:"+str(reason))
                 if not issubclass(resp.__class__, PlugwiseAckResponse):
-                    #Could be an Ack or AckMac error code response when same seqnr
+                    #Could be an Ack or AckMac or AcqAssociation error code response when same seqnr
                     try:
                         if (len(msg) == 22 and msg[0:1] == b'\x05') or (len(msg) == 23 and msg[0:1] == b'\x83'):
                             ackresp = PlugwiseAckResponse()
@@ -195,9 +195,41 @@ class Stick(SerialComChannel):
                         #response could be an error status message
                         logcomm("RERR %4d %s - <!> unexpected response error while interpreting as Ack: %s" % ( len(msg), repr(msg), str(reason)))
                         error("unexpected response [2]:"+str(reason))
+                error("TEST: %s" % (resp.function_code,))
+                if resp.function_code in ['0006', '0061']:
+                    #Could be an unsolicited AdvertiseNode or AcqAssociation response
+                    try:
+                        if resp.function_code == "0006":
+                            info("entering unknown advertise MAC ")
+                            ackresp = PlugwiseAdvertiseNodeResponse()
+                            ackresp.unserialize(msg)
+                            info("unknown advertise MAC %s" % str(ackresp.mac))
+                            if ackresp.mac not in self.unjoined:
+                                self.unjoined.add(ackresp.mac)
+                        elif resp.function_code == "0061":
+                            ackresp = PlugwiseAckAssociationResponse()
+                            ackresp.unserialize(msg)
+                            info("unknown MAC associating %s" % str(ackresp.mac))
+                        else:
+                            #it does not appear to be a proper Ack message
+                            #just retry to read next message
+                            logcomm("RERR %4d %s - <!> unexpected response error: %s" % ( len(msg), repr(msg), str(reason)))
+                            pass
+                    except ProtocolError as reason:
+                        #retry to receive the response
+                        logcomm("RERR %4d %s - <!> protocol error while interpreting as Advertise: %s" % ( len(msg), repr(msg), str(reason)))
+                        error("protocol error [5]:"+str(reason))
+                    except OutOfSequenceException as reason:
+                        #retry to receive the response
+                        logcomm("RERR %4d %s - <!> out of sequence while interpreting as Advertise: %s" % ( len(msg), repr(msg), str(reason)))
+                        error("protocol error [6]:"+str(reason))
+                    except UnexpectedResponse as reason:
+                        #response could be an error status message
+                        logcomm("RERR %4d %s - <!> unexpected response error while interpreting as Advertise: %s" % ( len(msg), repr(msg), str(reason)))
+                        error("unexpected response [3]:"+str(reason))
                 else:
                     logcomm("RERR %4d %s - <!> unexpected response error while expecting Ack: %s" % ( len(msg), repr(msg), str(reason)))                    
-                    error("unexpected response [3]:"+str(reason))
+                    error("unexpected response [4]:"+str(reason))
 
     def enable_joining(self, enabled):
         req = PlugwiseEnableJoiningRequest('', enabled)
@@ -276,6 +308,7 @@ class Circle(object):
         self.scheduleCRC = None
         self.schedule = None
         
+        self.joined = False
         self.online = False
         self.initialized = False
         self.relay_state = '?'
@@ -623,6 +656,9 @@ class Circle(object):
             prev_dt = getattr(resp, "logdate1").value
         else:
             prev_dt = start_dt
+        if prev_dt is None:
+            error("get_power_usage_history: empty first entry in power buffer")
+            return []
         prev2_dt = prev_dt
         both = False
         for i in range(0, 4):
@@ -799,6 +835,9 @@ class Circle(object):
         log = self.get_power_usage_history(cur_idx)
         if len(log)<3:
             log = self.get_power_usage_history(cur_idx-1) + log
+        if len(log)<3:
+            error("_get_interval: to few entries in power buffer to determine interval")
+            return
         #debug(log)
         interval = log[-1][0]-log[-2][0]
         self.usage=True
@@ -818,9 +857,9 @@ class Circle(object):
         #Needs to be called on Circle+
         nodetable = []
         for idx in range(0,64):
-            req = PlugwisePopulateRequest(self.mac, idx)
+            req = PlugwiseAssociatedNodesRequest(self.mac, idx)
             _, seqnr  = self._comchan.send_msg(req.serialize())
-            resp = self._expect_response(PlugwisePopulateResponse, seqnr)
+            resp = self._expect_response(PlugwiseAssociatedNodesResponse, seqnr)
             nodetable.append(resp.node_mac_id.value)
         return nodetable
         

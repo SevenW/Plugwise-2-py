@@ -1,0 +1,89 @@
+<div class="modal-header">
+            <h3 class="modal-title">{{conf.static.mac}} - {{conf.dynamic.name}}</h3>
+        </div>
+        <div class="modal-body">
+		
+		
+<form class="form-horizontal" role="form">
+  <div class="form-group">
+    <label for="iName" class="col-xs-3 control-label">Name</label>
+    <div class="col-xs-9">
+      <input type="text" class="form-control" id="iName" placeholder="name" ng-model="conf.dynamic.name">
+    </div>
+  </div>
+  <div class="form-group">
+    <label for="iLocation" class="col-xs-3 control-label">Location</label>
+    <div class="col-xs-9">
+      <input type="text" class="form-control" id="iLocation" placeholder="location" ng-model="conf.dynamic.location">
+    </div>
+  </div>
+  <div class="form-group">
+    <label for="iCategory" class="col-xs-3 control-label">Category</label>
+    <div class="col-xs-9">
+      <input type="text" class="form-control" id="iCategory" placeholder="category" ng-model="conf.dynamic.category">
+    </div>
+  </div>
+  <hr>
+  <div class="form-group">
+    <label for="iMonitor" class="col-xs-3 control-label">Monitor (10s)</label>
+    <div class="col-xs-9">
+      <input type="checkbox" class="form-control" id="iMonitor" placeholder="monitor" ng-true-value="'yes'" ng-false-value="'no'" ng-model="conf.dynamic.monitor">
+    </div>
+  </div>
+  <div class="form-group">
+    <label for="iSavelog" class="col-xs-3 control-label">Save log ({{conf.static.loginterval}}m)</label>
+    <div class="col-xs-9">
+      <input type="checkbox" class="form-control" id="iSaveLog" placeholder="save log" ng-true-value="'yes'" ng-false-value="'no'" ng-model="conf.dynamic.savelog">
+    </div>
+  </div>
+  <hr>
+  <div class="form-group">
+    <label for="iSwitch" class="col-xs-3 control-label">Switched on</label>
+    <div class="col-xs-9">
+      <input type="checkbox" class="form-control" id="iSwitch" placeholder="switch on" ng-true-value="'on'" ng-false-value="'off'" ng-model="conf.dynamic.switch_state">
+    </div>
+  </div>
+  <div class="form-group">
+    <label for="iScheduleOn" class="col-xs-3 control-label">Schedule on</label>
+    <div class="col-xs-9">
+      <input type="checkbox" class="form-control" id="iScheduleOn" placeholder="schedule on" ng-true-value="'on'" ng-false-value="'off'" ng-model="conf.dynamic.schedule_state">
+    </div>
+  </div>
+  <div class="form-group">
+    <label for="iSchedule" class="col-xs-3 control-label">Schedule Name</label>
+    <div class="col-xs-9">
+      <input type="text" class="form-control" id="iSchedule" placeholder="schedule name" ng-model="conf.dynamic.schedule">
+    </div>
+  </div>
+  <hr>Following items can't be changed.
+  <div class="form-group has-error">
+    <label for="iMac" class="col-xs-3 control-label">MAC</label>
+    <div class="col-xs-9">
+      <input type="text" class="form-control" id="iMac" placeholder="MAC" ng-model="conf.static.mac" disabled>
+    </div>
+  </div>
+  <div class="form-group has-error">
+    <label for="iAlwaysOn" class="col-xs-3 control-label">Always On</label>
+    <div class="col-xs-9">
+      <input type="checkbox" class="form-control" id="iAlwaysOn" placeholder="schedule on" ng-true-value="'True'" ng-false-value="'False'" ng-model="conf.static.always_on" disabled>
+    </div>
+  </div>
+  <div class="form-group has-error">
+    <label for="iProduction" class="col-xs-3 control-label">Production</label>
+    <div class="col-xs-9">
+      <input type="checkbox" class="form-control" id="iProduction" placeholder="production" ng-true-value="'True'" ng-false-value="'False'" ng-model="conf.static.production" disabled>
+    </div>
+  </div>
+    <div class="form-group has-error">
+    <label for="iInterval" class="col-xs-3 control-label">Log interval (m)</label>
+    <div class="col-xs-9">
+      <input type="text" class="form-control" id="iInterval" placeholder="log interval" ng-model="conf.static.loginterval" disabled>
+    </div>
+  </div>
+
+		
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-primary" ng-click="ok()">OK</button>
+            <button class="btn btn-warning" ng-click="cancel()">Cancel</button>
+        </div>

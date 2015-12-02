@@ -1,301 +1,303 @@
-var app = angular.module('schedules', ['ui.bootstrap']);
+var app = angular.module('pw2pyapp', ['ui.bootstrap']);
 
-var WIDE = true;
+app.controller("pw2pyCtrl", function pw2pyCtrl($scope, $http, WS){
+  $scope.conf = {static: []};
+  $scope.config = {dynamic: []};
+  $scope.circles = [];
+  $scope.obj = {state: false};
+  $scope.websockets = true;
 
-app.controller("mainCtrl", function mainCtrl($scope, $http){
-  $scope.tabs = [true, false, false];
-  $scope.temp = false;
-  $scope.curSched = "";
-  $scope.rows = [];
-  $scope.changed = false;
-  $scope.alrt = { type: 'success', msg: 'ok' };
-  $scope.mctrl = {addName: "", description: "description"}
-  $scope.mctrl.schedule = (WIDE ? zeroData() : transpose(zeroData()));
-  $scope.state = {changed: false, fit: true};
   
-  
-  $http.get('/schedules').
-    success(function(data, status, headers, config) {
-      $scope.rows = data.sort();
-    }).
-    error(function(data, status, headers, config) {
-      // log error
-    });
-	 
-  $scope.addRow = function(){
-    name = $scope.mctrl.addName;
-	$http.post("/schedules/" + name + ".json", createSchedule(name)).
+  $scope.loadConfig = function () {
+	console.log("loadConfig");
+	$http.get("/pw-conf.json").
 		success(function(data, status, headers, config) {
-			console.log("scheduled POST successful")
-		}).
-		error(function(data, status, headers, config) {
-		  // log error
-			console.log("scheduled POST error")
-		});
-	$scope.temp = false;
-    $scope.mctrl.addName="";
-	$scope.rows.sort();
-  };
-  
-  $scope.deleteRow = function(row){
-    $scope.rows.splice($scope.rows.indexOf(row),1);
-  };
-  
-  $scope.plural = function (tab){
-    return tab.length > 1 ? 's': ''; 
-  };
-  
-  $scope.addTemp = function(){
-    if($scope.temp) $scope.rows.pop(); 
-    else if($scope.mctrl.addName) $scope.temp = true;
-    
-    if($scope.mctrl.addName) $scope.rows.push($scope.mctrl.addName);
-    else $scope.temp = false;
-  };
-  
-  $scope.isTemp = function(i){
-    return i==$scope.rows.length-1 && $scope.temp;
-  };
-  
-  $scope.editRow = function (row) {
-    $scope.tabs[1] = true;
-    $scope.curSched = row;
-	console.log("editRow "+row);
-	$http.get("/schedules/" + row + ".json").
-		success(function(data, status, headers, config) {
-		  $scope.raw = data;
-		  $scope.mctrl.description = $scope.raw.description;
-		  $scope.mctrl.schedule = angular.copy(WIDE ? $scope.raw.schedule : transpose($scope.raw.schedule));
-		  $scope.curInfo = $scope.raw.name;
-		  $scope.alrt = { type: 'success', msg: 'schedule loaded' };
-		  $scope.state.changed = false;
-		}).
-		error(function(data, status, headers, config) {
-		  // log error
-		});
-  };
-  
-  $scope.saveSchedule = function(){
-	$scope.raw.schedule = (WIDE ? $scope.mctrl.schedule : transpose($scope.mctrl.schedule))
-	$scope.raw.description = $scope.mctrl.description;
-	$http.post("/schedules/" + $scope.curSched + ".json", $scope.raw).
-		success(function(data, status, headers, config) {
-			console.log("scheduled POST successful")
-		}).
-		error(function(data, status, headers, config) {
-		  // log error
-			console.log("scheduled POST error")
-		});
-
-	$scope.state.changed = false;
-	$scope.alrt.msg = 'schedule saved';
-	return;
-  };
-  
-  $scope.cancelSchedule = function(){
-	$scope.mctrl.schedule = angular.copy(WIDE ? $scope.raw.schedule : transpose($scope.raw.schedule));
-	$scope.mctrl.description = $scope.raw.description;
-	$scope.state.changed = false;
-	$scope.alrt.msg = 'reverted to saved';
-	return;
-  };
-  
-  $scope.setChanged = function(){
-	$scope.changed = true;
-	return;
-  }; 
-  
-  $scope.toggleWidth = function(){
-    console.log("toggleWidth()");
-	$scope.state.fit = !$scope.state.fit;
-	return;
-  }; 
-  
-  
-	function transpose(array) {
-	  var newArray = array[0].map(function(col, i) { 
-		return array.map(function(row) { 
-		  return row[i] 
-		});
-	  });
-	  return newArray
-	};
-
-	function zeroData () {
-		var matrix = [];
-		for (var j = 0; j < 7; j++) {
-			matrix.push(Array.apply(null, new Array(96)).map(Number.prototype.valueOf,0));
-		}
-		return matrix;
-	}
-	
-	function createSchedule (newname) {
-		var raw = {name: newname, description: "always on"};
-		raw.schedule = zeroData();
-		return raw;
-	}
-})
-
-app.directive('handsontable', function($window){
-    return {
-        restrict: 'EAC',
-        scope: {
-            schedule: '=',
-            alrt: '=',
-			unsaved: '=',
-			fit: '=',
-            valchanged: '&'
-        },
-        replace: true,
-        template: '<div></br></br></br></div>',
-        link: function(scope, elem, attrs ){
-			Handsontable.renderers.registerRenderer('valueRenderer', valueRenderer); //maps function to lookup string
-			//$(elem).handsontable({
-			elem.handsontable({
-			  startRows: (WIDE ? 7 : 96),
-			  startCols: (WIDE ? 96 : 7),
-			  maxRows: (WIDE ? 7 : 96),
-			  maxCols: (WIDE ? 96 : 7),
-			  colWidths: 36,
-			  //rowHeights: 36,
-			  rowHeaders: dayheaders,
-			  colHeaders: columnheaders_wide,
-			  cells: function (row, col, prop) {
-				var cellProperties = {};
-				cellProperties.type = 'numeric';
-				cellProperties.renderer = "valueRenderer"; //uses lookup map
-				cellProperties.data = 0;
-				return cellProperties;
-				},
-              data: scope.schedule,
-			  beforeChange: function (changes, source) {
-				for (var i = changes.length - 1; i >= 0; i--) {
-				  if (changes[i][3] == null || changes[i][3] === '') {
-					changes[i][3] = 0;
-				  } else if (isNaN(+changes[i][3])) {
-					return false;
-				  } else if  (changes[i][3] < 0) {
-					changes[i][3] = -1;
-				  } else if (changes[i][3] > 3000) {
-					changes[i][3] = -1; //ON in case of very high standby value
-				  }
-				}
-				if (source != 'loadData') {
-					scope.alrt.type = 'success';
-					scope.alrt.msg = 'schedule modified';
-					scope.unsaved = true;
-					scope.valchanged();
-					scope.$apply();
-				}
-			  },
-			  afterLoadData: function () {
-				var hot = elem.handsontable('getInstance');
-				scope.hot = hot;
-				for (var r = 0; r < scope.hot.countRows(); r++) {
-					for (var c = 0; c < scope.hot.countCols(); c++) {
-						var value = scope.hot.getDataAtCell(r, c);
-						if (value == null || value === '') {
-							scope.hot.setDataAtCell(r, c, 0);
-						} else if (typeof value === 'string') {
-							scope.hot.setDataAtCell(r, c, parseInt(value));
-						}
-					}
-				}
-			  },
-                
-            })
-			scope.hot = elem.handsontable('getInstance');
-			scope.$watch("schedule", function() {
-				console.log("HOT loadData");
-				scope.hot.loadData(scope.schedule);
-			});
-			scope.$watch("fit", function() {
-				console.log("Toggle fit");
-				if (scope.fit) {
-					//scope.hot.colWidths = 15;
-					//elem.width = $window.innerWidth;
-					var w = ($window.innerWidth - 50 ) / 96;
-					w=Math.max(1, Math.floor(w));
-					scope.hot.updateSettings({colWidths: w});
-				} else {
-					//scope.hot.colWidths = 30;
-					scope.hot.updateSettings({colWidths: 36});
-				}
-				//scope.hot.loadData(scope.schedule);
-				//scope.hot.render();
-			});
-			
-			//local functions for handsontable directive
-            function columnheaders_wide(index) {
-				var hour = Math.floor(index /4);
-				var minute = 15 * (index % 4);
-				var hour_s = (hour < 10 ? "0" + hour : hour);
-				var minute_s = (minute < 10 ? "0" + minute : minute);
-				var time = (hour < 10 ? "0" + hour : hour) + "00";
-				j = index % 4;
-				if (j==0) {
-					//return "<b>"+(hour < 10 ? "" : time[0])+"</br>"+time[1]+"</br>"+time[2]+"</br>"+time[3]+"</b>";
-					//return '<div class="htRight" style="color:blue;letter-spacing: -1px;"><small>'+hour_s+'</small></div>';
-					return '<div class="htRight text-info" style="letter-spacing: -1px;"><small>'+hour_s+'</small></div>';
-					};
-				//return '<div class="htRight" style="color:lightblue;"><small><small>'+minute_s+'</small></small></div>';
-				return '<div class="htRight text-primary"><small><small>'+minute_s+'</small></small></div>';
-			};
-			function rowheaders_wide(index) {
-				var hour = Math.floor(index /4);
-				var minute = 15 * (index % 4);
-				var time = (hour < 10 ? "0" + hour : hour) + ":" + (minute < 10 ? "0" + minute : minute);
-				return time;
-			};
-			function dayheaders(index) {
-				var days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-				return '<div class="htLeft" style="color:blue;"><small>'+days[index]+'</small></div>';
-			};
-			function valueRenderer(instance, td, row, col, prop, value, cellProperties) {
-			  Handsontable.renderers.TextRenderer.apply(this, arguments);
-			  if (value == null || value === '') {
-				td.style.background = 'red';
-			  } else if (parseInt(value, 10) == 0) {
-				//td.className = 'schedule-off';
-				td.style.background = '#bbb';
-				td.style.color = '#bbb'
-			  } else if (parseInt(value, 10) < 0) { 
-				//td.className = 'schedule-on';
-				td.style.background = '#f0ad4e'
-				td.style.color = '#f0ad4e'
-			  } else {
-				//td.className = 'schedule-on';
-				td.style.background = '#f8d6a6'
-				td.style.fontStyle = 'italic';
-				td.style.fontSize = 'smaller';
-				//td.style.textAlign = 'right';
-				//td.className = 'htRight';
-			  }
-			};
-        }
-    }
-})
-
-app.controller('ConfirmDeleteCtrl', function ConfirmDeleteCtrl($scope, $http, modalService) {
-    $scope.deleteSchedule = function (schedName) {
-        var modalOptions = {
-            closeButtonText: 'Cancel',
-            actionButtonText: 'Delete Schedule',
-            headerText: 'Delete ' + schedName + '?',
-            bodyText: 'Are you sure you want to delete this schedule?'
-        };
-
-        modalService.showModal({}, modalOptions).then(function (result) {
-            console.log("Delete confirmed!");
-			$http.post("/schedules", {'delete': schedName+'.json'}).
+		    $scope.conf = data;
+			$http.get("/pw-control.json").
 				success(function(data, status, headers, config) {
-					console.log("scheduled POST successful")
-					$scope.deleteRow(schedName);
+					$scope.config = data;
+					//Merge config
+					for (var i=0; i<$scope.conf.static.length; i++) {
+						var statconf = $scope.conf.static[i];
+						var circle = {};
+						for (var key in statconf) { circle[key] = statconf[key]; };
+						var dynconf = getByMac($scope.config.dynamic, circle.mac);
+						if (dynconf != null) {
+							for (var key in dynconf) { circle[key] = dynconf[key]; };
+						}
+						circle['alwayson'] = (circle.always_on == "True") ? true : false
+						if (circle['alwayson']) {
+							circle.switch_state = 'on';
+							circle.schedule_state = 'off';
+						}
+						circle['power'] = "-";
+						circle['relayon'] = circle.switch_state
+						
+						circle.toolTip = "interval: " + circle.loginterval + " min.<br>"
+						circle.toolTip += "monitor (10s): " + circle.monitor + "<br>"
+						circle.toolTip += "save log (" + circle.loginterval + "m): " + circle.savelog + "<br>"
+						circle.toolTip += "mac: " + circle.mac
+						
+						circle.icon = "fa-lightbulb-o"
+						if (circle.category == "PV") {
+							circle.icon = "fa-bolt"
+						} else if (circle.category == "divers") {
+							circle.icon = "fa-plug"
+						}
+						
+						//TESTCODE
+						//circle.alwayson = !(circle.name == 'circle+');
+						
+						
+ 						$scope.circles.push(circle);
+						console.log(dynconf);
+						console.log(statconf);
+						console.log(circle);
+						
+						//WS.connect();
+					}
 				}).
 				error(function(data, status, headers, config) {
 				  // log error
-					console.log("scheduled POST error")
 				});
-        });
-    }
+		}).
+		error(function(data, status, headers, config) {
+		  // log error
+		});
+  };
+  
+  function getByMac(arr, mac) {
+	for (var i=0; i<arr.length; i++) {
+	  if (arr[i].mac == mac) return arr[i];
+	}
+	return null;
+}
+  
+  $scope.changeScheduleX = function(circle){
+	console.log("schedule toggled to "+circle.schedule_state+" for "+circle.mac)
+	};
+
+  $scope.changeSwitchX = function(circle){
+	console.log("switch   toggled to "+circle.switch_state+" for "+circle.mac);
+	console.log(circle)
+	};
+
+  $scope.changeSwitch = function(circle){
+	console.log("switch   toggled to "+circle.switch_state+" for "+circle.mac);
+	circle.schedule_state = 'off'
+	//circle.relayon = circle.switch_state
+	//MQTT topic, payload
+	//plugwise2py/cmd/switch/000D6F0001Annnnn {"mac":"","cmd":"switch","val":"on"}
+	var topic = "plugwise2py/cmd/switch/"+circle.mac
+	var payload = {mac: circle.mac, cmd: "switch", val: circle.switch_state}
+	var msg = {topic: topic, payload: payload}
+	if ($scope.websockets) {
+		$scope.send(JSON.stringify(msg))
+	} else {
+		$http.post("/mqtt/", msg).
+			success(function(data, status, headers, config) {
+				console.log("scheduled POST successful")
+			}).
+			error(function(data, status, headers, config) {
+			  // log error
+				console.log("scheduled POST error")
+			});
+	}
+	return;
+  };
+  
+  $scope.changeSchedule = function(circle){
+	console.log("schedule   toggled to "+circle.schedule_state+" for "+circle.mac);
+	//MQTT topic, payload
+	//plugwise2py/cmd/schedule/000D6F0001Annnnn {"mac":"","cmd":"schedule","val":"on"}
+	var topic = "plugwise2py/cmd/schedule/"+circle.mac
+	var payload = {mac: circle.mac, cmd: "schedule", val: circle.schedule_state}
+	var msg = {topic: topic, payload: payload}
+	if ($scope.websockets) {
+		$scope.send(JSON.stringify(msg))
+	} else {
+		$http.post("/mqtt/", msg).
+			success(function(data, status, headers, config) {
+				console.log("scheduled POST successful")
+			}).
+			error(function(data, status, headers, config) {
+			  // log error
+				console.log("scheduled POST error")
+			});
+	}
+	return;
+  };
+  
+  //Init
+  $scope.loadConfig();
+  
+  //Handle WebSocket
+  $scope.lastmessage = {};
+ 
+  WS.subscribe(function(message) {
+    //$scope.messages.push(message);
+	$scope.lastmessage = message;
+	var msg;
+	try{
+		msg = JSON.parse(message);
+	}
+	catch(e){
+		console.log('Websocket message is not JSON: '+e.message);
+		return;
+	}
+	var circle = getByMac($scope.circles, msg.mac);
+	var power = "X"
+	if (msg.hasOwnProperty('power')) {
+		power = msg.power
+	} else if (msg.hasOwnProperty('power8s')) {
+		power = msg.power8s
+	}
+	if (power != "X") {
+		if (circle.production == 'True') {
+			power = -power;
+		}
+		circle.power = power.toFixed(1);
+	}
+	if (msg.hasOwnProperty('switch')) {
+		circle.relayon = msg.switch
+	}
+	if (msg.hasOwnProperty('switchreq')) {
+		circle.switch_state = msg.switchreq
+	}
+	if (msg.hasOwnProperty('schedule')) {
+		circle.schedule_state = msg.schedule
+	}
+	if (msg.hasOwnProperty('schedname')) {
+		circle.schedule = msg.schedname
+	}
+    $scope.$apply();
+  });
+  WS.connect();
+ 
+  $scope.connect = function() {
+    WS.connect();
+  }
+ 
+  $scope.disconnect = function() {
+    WS.disconnect();
+	//console.log("WS.disconnect not yet implemented")
+  }
+ 
+  $scope.send = function(msg) {
+    WS.send(msg);
+  }
+
+  $scope.sendtext = function() {
+    WS.send($scope.text);
+    $scope.text = "";
+  }
+
+
 });
+
+app.directive('btnSwitch', function(){
+    
+  return {
+    restrict : 'A',
+    //require :  'ngModel',
+    template : '<div class="btn-group" data-toggle="buttons-radio"><button type="button" class="btn btn-default" ng-class="{\'btn-warning\': state}" ng-click="turnSwitchOn(switch)">On</button><button type="button" class="btn btn-default" ng-class="{\'btn-default\': !state}" ng-click="turnSwitchOff(switch)">Off</button></div>',
+    replace : true,
+	scope: {
+            switch: '='//,
+            //state: '='
+        },
+
+    link : function(scope, element, attrs/*, ngModel*/){
+        // // Listen for the button click event to enable binding
+        // element.bind('click', function() {
+          // scope.$apply(toggle);             
+        // });
+                   
+        // // Toggle the model value
+        // function toggle() {
+           // var val = ngModel.$viewValue;
+           // ngModel.$setViewValue(!val); 
+           // render();          
+        // } 
+        scope.state = true;
+		scope.turnSwitchOn = function (id) {
+			console.log("switch on")
+			console.log(id)
+			scope.state = true;
+		};
+		scope.turnSwitchOff = function (id) {
+			console.log("switch off")
+			console.log(id)
+			scope.state = false;
+		};
+    }
+  };
+});
+
+app.factory('WS', function() {
+  var service = {};
+ 
+  service.connect = function() {
+    if(service.ws) { return; }
+ 
+    //var host = window.location.href.split("/")[2];
+    var host = window.location.host;
+	var ws;
+	if (window.location.protocol == 'https:') {
+		//ws = new WebSocket("wss://"+host+"/socket.ws");
+		ws = new ReconnectingWebSocket("wss://"+host+"/socket.ws");
+	} else {
+		//ws = new WebSocket("ws://"+host+"/socket.ws");
+		ws = new ReconnectingWebSocket("ws://"+host+"/socket.ws");
+	}
+ 
+    ws.onopen = function() {
+      service.callback('{"result": "Succeeded to open a connection"}');
+    };
+ 
+    ws.onerror = function() {
+      service.callback('{"result": "Failed to open a connection"}');
+    }
+ 
+    ws.onmessage = function(message) {
+      service.callback(message.data);
+    };
+ 
+    service.ws = ws;
+  }
+ 
+  service.disconnect = function(message) {
+    service.ws.close();
+	service.ws = null
+  }
+ 
+  service.send = function(message) {
+    service.ws.send(message);
+  }
+ 
+  service.subscribe = function(callback) {
+    service.callback = callback;
+  }
+ 
+  return service;
+});
+
+// app.controller("WSCtrl", function WSCtrl($scope, WS) {
+  // //$scope.messages = [];
+  // $scope.lastmessage = {};
+ 
+  // WS.subscribe(function(message) {
+    // //$scope.messages.push(message);
+	// $scope.lastmessage = JSON.parse(message);
+    // $scope.$apply();
+  // });
+ 
+  // $scope.connect = function() {
+    // WS.connect();
+  // }
+ 
+  // $scope.send = function() {
+    // WS.send($scope.text);
+    // $scope.text = "";
+  // }
+// })
