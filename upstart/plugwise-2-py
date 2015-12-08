@@ -1,0 +1,23 @@
+# description "Start and Stop Plugwise2py"
+# first version kindly provided by "Andreas Henriksson"
+#
+# Will NOT work on system without upstart (raspberry pi ...)
+#
+# Changes to be done:
+#
+# 1. setuid = Users who's running the script
+# 2. chdir = Path to Plugwise-2-py directory
+# 3. Change path to Plugwise-2.py in script area
+
+start on runlevel [2345]
+stop on runlevel [^2345]
+
+setuid user
+chdir /home/user/Plugwise-2-py
+
+respawn
+respawn limit 20 5
+
+script   
+    /home/user/Plugwise-2-py/Plugwise-2.py
+end script
