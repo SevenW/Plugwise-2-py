@@ -1215,7 +1215,10 @@ class PWControl(object):
             except:
                 pass
         if circleplus != None:
-            debug("joined node table: %s" % (circleplus.read_node_table(),))
+            try:
+                debug("joined node table: %s" % (circleplus.read_node_table(),))
+            except:
+                error("PWControl.run(): Communication error in read_node_table")
       
         #Inform network that nodes are allowed to join the network
         #Nodes may start advertising themselves with a 0006 message.
