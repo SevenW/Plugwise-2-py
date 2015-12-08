@@ -322,6 +322,7 @@ class Circle(object):
         self.last_log = 0
         self.last_log_idx = 0
         self.last_log_ts = 0
+        self.cum_energy = 0
         
         self.power = [0, 0, 0, 0]
         self.power_ts = 0

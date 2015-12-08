@@ -171,18 +171,21 @@ class PWControl(object):
             for line in f:
                 parts = line.split(',')
                 mac, logaddr = parts[0:2]
-                if len(parts) == 4:
+                idx = 0
+                ts = 0
+                cum_energy = 0
+                if len(parts) == 5:
+                    cum_energy = float(parts[4])
+                if len(parts) >= 4:
                     idx = int(parts[2])
                     ts = int(parts[3])
-                else:
-                    idx = 0
-                    ts = 0
                 logaddr =  int(logaddr)
-                debug("mac -%s- logaddr -%s- logaddr_idx -%s- logaddr_ts -%s-" % (mac, logaddr, idx, ts))
+                debug("mac -%s- logaddr -%s- logaddr_idx -%s- logaddr_ts -%s- cum_energy -%s-" % (mac, logaddr, idx, ts, cum_energy))
                 try:
                     self.circles[self.bymac[mac]].last_log = logaddr
                     self.circles[self.bymac[mac]].last_log_idx = idx
                     self.circles[self.bymac[mac]].last_log_ts = ts
+                    self.circles[self.bymac[mac]].cum_energy = cum_energy
                 except:
                     error("PWControl.__init__(): lastlog mac not found in circles")
          
@@ -967,6 +970,8 @@ class PWControl(object):
             prev_dt = datetime.now()-timedelta(days=2000)
             for dt, watt, watt_hour in log:
                 if not dt is None:                
+                    #calculate cumulative energy in Wh
+                    c.cum_energy = c.cum_energy + watt_hour
                     watt = "%15.4f" % (watt,)
                     watt_hour = "%15.4f" % (watt_hour,)
                     if epochf:
@@ -1005,7 +1010,7 @@ class PWControl(object):
                     prev_dt = dt                
                     f.write("%s, %s, %s\n" % (ts_str, watt, watt_hour))
                     #debug("MQTT put value in qpub")
-                    msg = str('{"typ":"pwenergy","ts":%s,"mac":"%s","power":%s,"energy":%s,"interval":%d}' % (ts_str, mac, watt.strip(), watt_hour.strip(),c.interval))
+                    msg = str('{"typ":"pwenergy","ts":%s,"mac":"%s","power":%s,"energy":%s,"cum_energy":%.4f,"interval":%d}' % (ts_str, mac, watt.strip(), watt_hour.strip(), c.cum_energy, c.interval))
                     qpub.put((self.ftopic("energy", mac), msg, True))
             if not f == None:
                 f.close()
@@ -1016,7 +1021,7 @@ class PWControl(object):
             #store lastlog addresses to file
             with open(self.lastlogfname, 'w') as f:
                 for c in self.circles:
-                    f.write("%s, %d, %d, %d\n" % (c.mac, c.last_log, c.last_log_idx, c.last_log_ts))
+                    f.write("%s, %d, %d, %d, %.4f\n" % (c.mac, c.last_log, c.last_log_idx, c.last_log_ts, c.cum_energy))
                             
         return fileopen #if fileopen actual writing to log files took place
         
