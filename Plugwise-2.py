@@ -171,18 +171,21 @@ class PWControl(object):
             for line in f:
                 parts = line.split(',')
                 mac, logaddr = parts[0:2]
-                if len(parts) == 4:
+                idx = 0
+                ts = 0
+                cum_energy = 0
+                if len(parts) == 5:
+                    cum_energy = float(parts[4])
+                if len(parts) >= 4:
                     idx = int(parts[2])
                     ts = int(parts[3])
-                else:
-                    idx = 0
-                    ts = 0
                 logaddr =  int(logaddr)
-                debug("mac -%s- logaddr -%s- logaddr_idx -%s- logaddr_ts -%s-" % (mac, logaddr, idx, ts))
+                debug("mac -%s- logaddr -%s- logaddr_idx -%s- logaddr_ts -%s- cum_energy -%s-" % (mac, logaddr, idx, ts, cum_energy))
                 try:
                     self.circles[self.bymac[mac]].last_log = logaddr
                     self.circles[self.bymac[mac]].last_log_idx = idx
                     self.circles[self.bymac[mac]].last_log_ts = ts
+                    self.circles[self.bymac[mac]].cum_energy = cum_energy
                 except:
                     error("PWControl.__init__(): lastlog mac not found in circles")
          
@@ -403,9 +406,10 @@ class PWControl(object):
         c = self.circles[self.bymac[mac]]
         debug('circle mac: %s before1 - state [r,sw,sc] %s %s %s - scname %s' % (mac, c.relay_state, control['switch_state'], control['schedule_state'], control['schedule']))
         debug('circle mac: %s before2 - state [r,sw,sc] %s %s %s' % (c.mac, c.relay_state, c.switch_state, c.schedule_state))
-        updated = updated | self.apply_schedstate_to_circle(control, mac, force)
+        source = "internal"
+        updated = updated | self.apply_schedstate_to_circle(control, mac, source, force)
         if control['schedule_state'] != 'on':
-            updated = updated | self.apply_switch_to_circle(control, mac, force)
+            updated = updated | self.apply_switch_to_circle(control, mac, source, force)
         else:
             #prime the switch state for consistency between circle and control
             try:
@@ -488,7 +492,7 @@ class PWControl(object):
                 error("schedule name from controls '%s' not found in table of schedules" % (schedname,))
         return circle_changed
                                     
-    def apply_switch_to_circle(self, control, mac, force=False):
+    def apply_switch_to_circle(self, control, mac, source, force=False):
         """apply control settings to circle
         in case of a communication problem, c.online is set to False by api
         self.test_offline() will apply the control settings again by calling this function
@@ -501,6 +505,8 @@ class PWControl(object):
         if not c.online:
             return False
         switched = False
+        c.requid = source
+
         #switch on/off if required
         sw_state = control['switch_state'].lower()
         if sw_state == 'on' or sw_state == 'off':
@@ -517,7 +523,7 @@ class PWControl(object):
             error('invalid switch_state value in controls file')
         return switched
 
-    def apply_schedstate_to_circle(self, control, mac, force=False):
+    def apply_schedstate_to_circle(self, control, mac, source, force=False):
         """apply control settings to circle
         in case of a communication problem, c.online is set to False by api
         self.test_offline() will apply the control settings again by calling this function
@@ -531,6 +537,7 @@ class PWControl(object):
             print "offline"
             return False
         switched = False
+        c.requid = source
         
         #force schedule_state to off when no schedule is defined
         if ((not control['schedule']) or control['schedule'] == "") and control['schedule_state'].lower() == 'on':
@@ -701,6 +708,10 @@ class PWControl(object):
                 msg = json.loads(payl)
                 control = self.controls[self.controlsbymac[mac]]
                 val = msg['val']
+                try:
+                    source = msg['uid']
+                except: #KeyError:
+                    source = "anonymous_mqtt"
             except:
                 error("MQTT: Invalid message format in topic or JSON payload")
                 continue
@@ -708,7 +719,7 @@ class PWControl(object):
                 val = val.lower()
                 if val == "on" or val == "off":
                     control['switch_state'] = val
-                    updated = self.apply_switch_to_circle(control, mac)
+                    updated = self.apply_switch_to_circle(control, mac, source)
                     #switch command overrides schedule_state setting
                     control['schedule_state'] = "off"
                 else:
@@ -717,7 +728,7 @@ class PWControl(object):
                 val = val.lower()
                 if val == "on" or val == "off":
                     control['schedule_state'] = val
-                    updated = self.apply_schedstate_to_circle(control, mac)
+                    updated = self.apply_schedstate_to_circle(control, mac, source)
                 else:
                     error("MQTT command has invalid value %s" % (val,))
             elif cmd == "setsched":
@@ -959,6 +970,8 @@ class PWControl(object):
             prev_dt = datetime.now()-timedelta(days=2000)
             for dt, watt, watt_hour in log:
                 if not dt is None:                
+                    #calculate cumulative energy in Wh
+                    c.cum_energy = c.cum_energy + watt_hour
                     watt = "%15.4f" % (watt,)
                     watt_hour = "%15.4f" % (watt_hour,)
                     if epochf:
@@ -997,7 +1010,7 @@ class PWControl(object):
                     prev_dt = dt                
                     f.write("%s, %s, %s\n" % (ts_str, watt, watt_hour))
                     #debug("MQTT put value in qpub")
-                    msg = str('{"typ":"pwenergy","ts":%s,"mac":"%s","power":%s,"energy":%s,"interval":%d}' % (ts_str, mac, watt.strip(), watt_hour.strip(),c.interval))
+                    msg = str('{"typ":"pwenergy","ts":%s,"mac":"%s","power":%s,"energy":%s,"cum_energy":%.4f,"interval":%d}' % (ts_str, mac, watt.strip(), watt_hour.strip(), c.cum_energy, c.interval))
                     qpub.put((self.ftopic("energy", mac), msg, True))
             if not f == None:
                 f.close()
@@ -1008,7 +1021,7 @@ class PWControl(object):
             #store lastlog addresses to file
             with open(self.lastlogfname, 'w') as f:
                 for c in self.circles:
-                    f.write("%s, %d, %d, %d\n" % (c.mac, c.last_log, c.last_log_idx, c.last_log_ts))
+                    f.write("%s, %d, %d, %d, %.4f\n" % (c.mac, c.last_log, c.last_log_idx, c.last_log_ts, c.cum_energy))
                             
         return fileopen #if fileopen actual writing to log files took place
         
