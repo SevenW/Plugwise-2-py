@@ -36,6 +36,7 @@ import sys
 import time
 import math
 from datetime import datetime, timedelta
+import time
 import calendar
 import logging
 from serial.serialutil import SerialException
@@ -52,9 +53,10 @@ class Stick(SerialComChannel):
     """provides interface to the Plugwise Stick"""
 
     def __init__(self, port=0, timeout=DEFAULT_TIMEOUT):
-        SerialComChannel.__init__(self, port=port, timeout=timeout)
         self.unjoined = set()
-        self.init()
+        SerialComChannel.__init__(self, port=port, timeout=timeout)
+        if self.connected:
+            self.init()
 
     def init(self):
         """send init message to the stick"""
@@ -63,10 +65,29 @@ class Stick(SerialComChannel):
         resp = self.expect_response(PlugwiseStatusResponse)
         debug(str(resp))
 
+    def reconnect(self):
+        """recover from disconnected serial device"""
+        try:
+            info("Reconnecting to serial device")
+            self.close()
+            time.sleep(1)
+            self.reopen()
+        except Exception as e:
+            print e      
+            error("Error: %s" % str(e),) 
+        #if init raises an exception, let the application handle it.
+        if self.connected:
+            self.init()
+
     def send_msg(self, cmd):
         #log communication done in serialize function of message object. Could be too early!
         debug("SEND %4d %s" % (len(cmd), repr(cmd)))
-        self.write(cmd)
+        try:
+            self.write(cmd)
+        except SerialException as e:
+            print e
+            info("SerialException during write - recovering. msg %s" % str(e))
+            self.reconnect()
         resp = self.expect_response(PlugwiseAckResponse)
         success = False
         if resp.status.value == 0xC1:
@@ -78,7 +99,12 @@ class Stick(SerialComChannel):
         msg = ""
         retry_timeout += 1
         while await_response:
-            msg += self.readline()
+            try:
+                msg += self.readline()
+            except SerialException as e:
+                print e
+                info("SerialException during readline - recovering. msg %s" % str(e))
+                self.reconnect()
             # if msg == b"":
                 # logcomm("TOUT      '' - <!> Timeout on serial port" )        
                 # raise TimeoutException("Timeout while waiting for response from device")                

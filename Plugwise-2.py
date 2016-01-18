@@ -123,6 +123,9 @@ class PWControl(object):
         global curpost
                 
         self.device = Stick(port, timeout=1)
+        while not self.device.connected:
+            time.sleep(5)
+            self.device.reconnect()
         self.staticconfig_fn = 'config/pw-conf.json'
         self.control_fn = 'config/pw-control.json'
         #self.schedule_fn = 'config/pw-schedules.json'
