@@ -151,7 +151,8 @@ class SerialComChannel(object):
         if self._fd == None:
             self.open()
         else:
-            self._fd.open()
+            if(self._fd.isOpen() == False):
+                self._fd.open()
         
     def close(self):
         if self._fd != None:
@@ -163,7 +164,7 @@ class SerialComChannel(object):
             try:
                 self.reopen()
             except Exception as e:
-                info("read reopen exception %s", str(e))
+                info("read reopen exception %s" % str(e))
         return self._fd.read(bytecount)
 
     def readline(self):
@@ -171,7 +172,7 @@ class SerialComChannel(object):
             try:
                 self.reopen()
             except Exception as e:
-                info("readline reopen exception %s", str(e))
+                info("readline reopen exception %s" % str(e))
         return self._fd.readline()
 
     def write(self, data):
@@ -179,5 +180,5 @@ class SerialComChannel(object):
             try:
                 self.reopen()
             except Exception as e:
-                info("write reopen exception %s", str(e))
+                info("write reopen exception %s" % str(e))
         self._fd.write(data)
