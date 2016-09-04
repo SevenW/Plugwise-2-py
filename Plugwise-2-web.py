@@ -340,14 +340,17 @@ def main():
         server.daemon_threads = True
         server.auth = b64encode(credentials)
         if secure:
-            #server.socket = ssl.wrap_socket (server.socket, certfile='./server.pem', server_side=True, ssl_version=ssl.PROTOCOL_TLSv1_2)
-            ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-            ctx.load_cert_chain(certfile="./server.pem")
-            ctx.options |= ssl.OP_NO_TLSv1
-            ctx.options |= ssl.OP_NO_TLSv1_1
-            ctx.options |= ssl.OP_CIPHER_SERVER_PREFERENCE
-            ctx.set_ciphers('ECDHE-RSA-AES256-GCM-SHA384 ECDHE-RSA-AES256-SHA384 ECDHE-RSA-AES256-SHA')
-            server.socket = ctx.wrap_socket(server.socket, server_side=True)
+            if sys.hexversion < 0x02071000:
+                #server.socket = ssl.wrap_socket (server.socket, certfile='./server.pem', server_side=True, ssl_version=ssl.PROTOCOL_TLSv1_2)
+                server.socket = ssl.wrap_socket (server.socket, certfile='./server.pem', server_side=True, ssl_version=ssl.PROTOCOL_TLSv1)
+            else:
+                ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+                ctx.load_cert_chain(certfile="./server.pem")
+                ctx.options |= ssl.OP_NO_TLSv1
+                ctx.options |= ssl.OP_NO_TLSv1_1
+                ctx.options |= ssl.OP_CIPHER_SERVER_PREFERENCE
+                ctx.set_ciphers('ECDHE-RSA-AES256-GCM-SHA384 ECDHE-RSA-AES256-SHA384 ECDHE-RSA-AES256-SHA')
+                server.socket = ctx.wrap_socket(server.socket, server_side=True)
             
             info('started secure https server at port %d' % (port,))
         else: 

@@ -689,14 +689,14 @@ class Circle(object):
             error("get_power_usage_history: empty first entry in power buffer")
             return []
         prev2_dt = prev_dt
-        both = False
+        #both = False
         for i in range(0, 4):
             dt = getattr(resp, "logdate%d" % (i+1,)).value
             if not dt is None:
                 dts.append(dt)
                 pulses.append(getattr(resp, "pulses%d" % (i+1,)).value)
                 if prev_dt == dts[i]:
-                    both = True
+                    #both = True
                     intervals.append((dts[i]-prev2_dt).total_seconds())
                 else:
                     intervals.append((dts[i]-prev_dt).total_seconds())               
@@ -711,13 +711,19 @@ class Circle(object):
             if intervals[i] == 0:
                 if len(dts)>i+1 and dts[i] == dts[i+1]:
                     if len(dts)>i+2:
-                        intervals[i] = (dts[i+2]-dts[i]).total_seconds()
+                        intervals[i] = (dts[i+2]-dts[i]).total_seconds()                        
                     else:
                         intervals[i]=3600
                 elif len(dts)>i+1:  
                     intervals[i] = (dts[i+1]-dts[i]).total_seconds()
                 else:
                     intervals[i]=3600
+                if intervals[i] == 0:
+                    #can occur when time syncing the circle sets time some seconds back.
+                    error("get_power_usage_history: all four intervals having same timestamp. set interval=60")
+                    error("get_power_usage_history: dts %s" % dts)
+                    error("get_power_usage_history: pulses %s" % pulses)
+                    intervals[i] = 60
                
             corrected_pulses = self.pulse_correction(pulses[i], intervals[i])
             watt = self.pulses_to_kWs(corrected_pulses)/intervals[i]*1000
