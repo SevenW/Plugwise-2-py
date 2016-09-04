@@ -108,6 +108,7 @@ if rsyncing:
     # /tmp/pwact-* may have disappeared, while the persitent version exists
     perfile = perpath + yrfolder + actdir + actpre + now.date().isoformat() + '*' + actpost
     cmd = "rsync -aXuq " +  perfile + " " + tmppath + yrfolder + actdir
+    print cmd
     subprocess.call(cmd, shell=True)
  
 class PWControl(object):
@@ -123,6 +124,9 @@ class PWControl(object):
         global curpost
                 
         self.device = Stick(port, timeout=1)
+        while not self.device.connected:
+            time.sleep(5)
+            self.device.reconnect()
         self.staticconfig_fn = 'config/pw-conf.json'
         self.control_fn = 'config/pw-control.json'
         #self.schedule_fn = 'config/pw-schedules.json'
@@ -857,13 +861,33 @@ class PWControl(object):
                     #last = 6016
                     #TODO: correct if needed
                     last = 6015
+            #read maximum 100 positions at a time for responisveness and robustness for communication errors
+            if last > first + 100:
+                last = first + 100
             log = []
             try:
                 #read one more than request to determine interval of first measurement
                 #TODO: fix after reading debug log
                 if last_dt == None:
                     if first>0:
+                        #last_dt == None and first != 0 can occur under exceptional conditions:
+                        #Possibly in case of corruption of pwlastlog.log, or deliberately after
+                        #manual edits of this file
                         powlist = c.get_power_usage_history(first-1)
+                        if len(powlist) < 4:
+                            #this may occur when history is not written before: error in first-address
+                            #or when the currently to be written address is catching up with the first-address
+                            #to be read here. Soon to be written history addresses are initialized to FF.   
+                            #to solve this, just walk to next address and try in next iteration again.
+                            error("log_recording: first time history reading: history entry not complete at first %d, cur %d" % (first, c_info['last_logaddr']))
+                            if first != c_info['last_logaddr']:
+                                first = first + 1
+                                if first >= 6016:
+                                    first = 0
+                                c.last_log = first
+                                c.last_log_idx = 0
+                                c.last_log_ts = 0
+                            return
                         last_dt = powlist[3][0]
                         #The unexpected case where both consumption and production are logged
                         #Probably this case does not work at all
@@ -877,6 +901,7 @@ class PWControl(object):
                             powlist[2][0].strftime("%Y-%m-%d %H:%M"),
                             powlist[3][0].strftime("%Y-%m-%d %H:%M")))
                     elif first == 0:
+                        #this is the "first run" use case where there was no prior data extracted from history buffers.
                         powlist = c.get_power_usage_history(0)
                         if len(powlist) > 2 and powlist[0][0] is not None and powlist[1][0] is not None:
                             last_dt = powlist[0][0]

@@ -36,6 +36,7 @@ import sys
 import time
 import math
 from datetime import datetime, timedelta
+import time
 import calendar
 import logging
 from serial.serialutil import SerialException
@@ -52,9 +53,10 @@ class Stick(SerialComChannel):
     """provides interface to the Plugwise Stick"""
 
     def __init__(self, port=0, timeout=DEFAULT_TIMEOUT):
-        SerialComChannel.__init__(self, port=port, timeout=timeout)
         self.unjoined = set()
-        self.init()
+        SerialComChannel.__init__(self, port=port, timeout=timeout)
+        if self.connected:
+            self.init()
 
     def init(self):
         """send init message to the stick"""
@@ -63,10 +65,29 @@ class Stick(SerialComChannel):
         resp = self.expect_response(PlugwiseStatusResponse)
         debug(str(resp))
 
+    def reconnect(self):
+        """recover from disconnected serial device"""
+        try:
+            info("Reconnecting to serial device")
+            self.close()
+            time.sleep(1)
+            self.reopen()
+        except Exception as e:
+            print e      
+            error("Error: %s" % str(e),) 
+        #if init raises an exception, let the application handle it.
+        if self.connected:
+            self.init()
+
     def send_msg(self, cmd):
         #log communication done in serialize function of message object. Could be too early!
         debug("SEND %4d %s" % (len(cmd), repr(cmd)))
-        self.write(cmd)
+        try:
+            self.write(cmd)
+        except SerialException as e:
+            print e
+            info("SerialException during write - recovering. msg %s" % str(e))
+            self.reconnect()
         resp = self.expect_response(PlugwiseAckResponse)
         success = False
         if resp.status.value == 0xC1:
@@ -78,7 +99,12 @@ class Stick(SerialComChannel):
         msg = ""
         retry_timeout += 1
         while await_response:
-            msg += self.readline()
+            try:
+                msg += self.readline()
+            except SerialException as e:
+                print e
+                info("SerialException during readline - recovering. msg %s" % str(e))
+                self.reconnect()
             # if msg == b"":
                 # logcomm("TOUT      '' - <!> Timeout on serial port" )        
                 # raise TimeoutException("Timeout while waiting for response from device")                
@@ -663,14 +689,14 @@ class Circle(object):
             error("get_power_usage_history: empty first entry in power buffer")
             return []
         prev2_dt = prev_dt
-        both = False
+        #both = False
         for i in range(0, 4):
             dt = getattr(resp, "logdate%d" % (i+1,)).value
             if not dt is None:
                 dts.append(dt)
                 pulses.append(getattr(resp, "pulses%d" % (i+1,)).value)
                 if prev_dt == dts[i]:
-                    both = True
+                    #both = True
                     intervals.append((dts[i]-prev2_dt).total_seconds())
                 else:
                     intervals.append((dts[i]-prev_dt).total_seconds())               
@@ -685,13 +711,19 @@ class Circle(object):
             if intervals[i] == 0:
                 if len(dts)>i+1 and dts[i] == dts[i+1]:
                     if len(dts)>i+2:
-                        intervals[i] = (dts[i+2]-dts[i]).total_seconds()
+                        intervals[i] = (dts[i+2]-dts[i]).total_seconds()                        
                     else:
                         intervals[i]=3600
                 elif len(dts)>i+1:  
                     intervals[i] = (dts[i+1]-dts[i]).total_seconds()
                 else:
                     intervals[i]=3600
+                if intervals[i] == 0:
+                    #can occur when time syncing the circle sets time some seconds back.
+                    error("get_power_usage_history: all four intervals having same timestamp. set interval=60")
+                    error("get_power_usage_history: dts %s" % dts)
+                    error("get_power_usage_history: pulses %s" % pulses)
+                    intervals[i] = 60
                
             corrected_pulses = self.pulse_correction(pulses[i], intervals[i])
             watt = self.pulses_to_kWs(corrected_pulses)/intervals[i]*1000

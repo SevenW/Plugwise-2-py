@@ -23,6 +23,7 @@
 
 import sys
 import serial
+from serial.serialutil import SerialException
 import datetime
 import logging
 import logging.handlers
@@ -124,21 +125,60 @@ class SerialComChannel(object):
     """simple wrapper around serial module"""
 
     def __init__(self, port="/dev/ttyUSB0", baud=115200, bits=8, stop=1, parity='N', timeout=5):
+        self.connected = False
         self.port = port
         self.baud = baud
         self.bits = bits
         self.stop = stop
         self.parity = parity
-        self._fd = serial.Serial(port, baudrate=baud, bytesize=bits, stopbits=stop, parity=parity, timeout=timeout)
+        self.timeout = timeout
+        self.open()
+        # try:
+            # self._fd = serial.Serial(port, baudrate=baud, bytesize=bits, stopbits=stop, parity=parity, timeout=timeout)
+            # self.connected = True
+        # except SerialException as e:
+            # self.connected = False
 
     def open(self):
-        self._fd = Serial(port=self.port, baudrate=self.baud, bytesize=self.bits, parity='N', stopbits=stop)
+        try:
+            self._fd = serial.Serial(port=self.port, baudrate=self.baud, bytesize=self.bits, parity=self.parity, stopbits=self.stop, timeout=self.timeout)
+            self.connected = True
+        except SerialException as e:
+            self.connected = False
+            self._fd = None
+        
+    def reopen(self):
+        if self._fd == None:
+            self.open()
+        else:
+            if(self._fd.isOpen() == False):
+                self._fd.open()
+        
+    def close(self):
+        if self._fd != None:
+            self._fd.close()
+        self.connected = False
 
     def read(self, bytecount):
+        if not self.connected:
+            try:
+                self.reopen()
+            except Exception as e:
+                info("read reopen exception %s" % str(e))
         return self._fd.read(bytecount)
 
     def readline(self):
+        if not self.connected:
+            try:
+                self.reopen()
+            except Exception as e:
+                info("readline reopen exception %s" % str(e))
         return self._fd.readline()
 
     def write(self, data):
+        if not self.connected:
+            try:
+                self.reopen()
+            except Exception as e:
+                info("write reopen exception %s" % str(e))
         self._fd.write(data)
