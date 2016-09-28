@@ -565,7 +565,7 @@ class Circle(object):
         debug("POWER:          1h: %.3f" % (kw_1h,))
         kw_p_1h = 1000*self.pulses_to_kWs(self.pulse_correction(pulse_prod_1h, 3600))/3600.0
         debug("POWER:     prod 1h: %.3f" % (kw_p_1h,))
-        if 'reverse_pol' in self.attr and self.attr['reverse_pol']:
+        if 'reverse_pol' in self.attr and self.attr['reverse_pol'] == 'True':
             kw_1s = -kw_1s 
             kw_8s = -kw_8s
             kw_1h = -kw_1h
@@ -736,7 +736,7 @@ class Circle(object):
             corrected_pulses = self.pulse_correction(pulses[i], intervals[i])
             watt = self.pulses_to_kWs(corrected_pulses)/intervals[i]*1000
             watthour = self.pulses_to_kWs(corrected_pulses)/3600*1000
-            if 'reverse_pol' in self.attr and self.attr['reverse_pol']:
+            if 'reverse_pol' in self.attr and self.attr['reverse_pol'] == 'True':
                 watt = -watt 
                 watthour = -watthour
                 debug("get_power_usage_history: reverse polarity of %s" % (self.mac,))
