@@ -84,7 +84,8 @@ app.controller("pw2pyCtrl", function pw2pyCtrl($scope, $http, WS){
 
   $scope.changeSwitch = function(circle){
 	console.log("switch   toggled to "+circle.switch_state+" for "+circle.mac);
-	circle.schedule_state = 'off'
+	//circle.schedule_state = 'off'
+	
 	//circle.relayon = circle.switch_state
 	//MQTT topic, payload
 	//plugwise2py/cmd/switch/000D6F0001Annnnn {"mac":"","cmd":"switch","val":"on"}
@@ -160,10 +161,11 @@ app.controller("pw2pyCtrl", function pw2pyCtrl($scope, $http, WS){
 	}
 	if (msg.hasOwnProperty('switch')) {
 		circle.relayon = msg.switch
+		circle.switch_state = msg.switch
 	}
-	if (msg.hasOwnProperty('switchreq')) {
-		circle.switch_state = msg.switchreq
-	}
+	//if (msg.hasOwnProperty('switchreq')) {
+	//	circle.switch_state = msg.switchreq
+	//}
 	if (msg.hasOwnProperty('schedule')) {
 		circle.schedule_state = msg.schedule
 	}

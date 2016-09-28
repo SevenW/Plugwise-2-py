@@ -633,13 +633,13 @@ class Circle(object):
                 error("Wrong switch status reply when  switching on. expected '00D8', received '%04X'" % (resp.status.value,))
             self.switch_state = 'on'
             self.relay_state = 'on'
-            self.schedule_state = 'off'
+            #self.schedule_state = 'off'
         else:
             if resp.status.value != 0xDE:
                 error("Wrong switch status reply when switching off. expected '00DE', received '%04X'" % (resp.status.value,))
             self.switch_state = 'off'
             self.relay_state = 'off'
-            self.schedule_state = 'off'
+            #self.schedule_state = 'off'
         return 
 
     def switch_on(self):

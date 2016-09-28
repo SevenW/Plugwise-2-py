@@ -161,6 +161,7 @@ class PWControl(object):
             #remove tabs which survive dialect='trimmed'
             for key in item:
                 if isinstance(item[key],str): item[key] = item[key].strip()
+            item['mac'] = item['mac'].upper()
             self.bymac[item.get('mac')]=i
             self.byname[item.get('name')]=i
             #exception handling timeouts done by circle object for init
@@ -379,6 +380,7 @@ class PWControl(object):
             #remove tabs which survive dialect='trimmed'
             for key in item:
                 if isinstance(item[key],str): item[key] = item[key].strip()
+            item['mac'] = item['mac'].upper()
             newcontrols.append(item)
             self.controlsbymac[item['mac']]=i
             i += 1
@@ -414,14 +416,17 @@ class PWControl(object):
         updated = updated | self.apply_schedstate_to_circle(control, mac, source, force)
         if control['schedule_state'] != 'on':
             updated = updated | self.apply_switch_to_circle(control, mac, source, force)
-        else:
-            #prime the switch state for consistency between circle and control
-            try:
-                c = self.circles[self.bymac[mac]]
-                updated = updated | (c.switch_state != control['switch_state'])
-                c.switch_state = control['switch_state']
-            except:
-                info("mac from controls not found in circles while prime switch state")
+        #old approach to schedules
+        #comment out code
+        # else:
+            # #prime the switch state for consistency between circle and control
+            # try:
+                # c = self.circles[self.bymac[mac]]
+                # c.get_info()
+                # updated = updated | (c.switch_state != control['switch_state'])
+                # c.switch_state = control['switch_state']
+            # except:
+                # info("mac from controls not found in circles while prime switch state")
             
         if updated:
             self.publish_circle_state(mac)
@@ -520,7 +525,7 @@ class PWControl(object):
                 try:
                     c.switch(sw)
                 except (ValueError, TimeoutException, SerialException) as reason:
-                    error("Error in apply_control_to_circle failed to switch: %s" % (reason,))
+                    error("Error in apply_switch_to_circle failed to switch: %s" % (reason,))
                     return False
                 switched = True
         else:
@@ -552,8 +557,12 @@ class PWControl(object):
 
 
         #switch schedule on/off if required
-        sw_state = control['switch_state'].lower()
-        sw = True if sw_state == 'on' else False
+        
+        #New approach to schedules. No need to operate switch
+        #comment out code
+        #sw_state = control['switch_state'].lower()
+        #sw = True if sw_state == 'on' else False
+        
         sc_state = control['schedule_state'].lower()
         if sc_state == 'on' or sc_state == 'off':
             sc = True if sc_state == 'on' else False
@@ -561,13 +570,24 @@ class PWControl(object):
                 info('circle mac: %s needs schedule to be switched %s' % (mac, sc_state))
                 try:
                     c.schedule_onoff(sc)
-                    if not sc:
-                        #make sure to put switch in proper position when switching off schedule
-                        c.switch(sw)
+                    #New approach to schedules. No need to operate switch
+                    if sc:
+                        #update switch in circles and controls to relay state
+                        #temporary logging to monitor changed schedule policy
+                        if (c.switch_state != c.relay_state):
+                            info("apply_schedstate_to_circle: set switch_state to relay_state when schedule is used")
+                        c.switch_state = c.relay_state
+                        control['switch_state'] = c.switch_state
+                    #comment out code
+                    #if not sc:
+                    #    #make sure to put switch in proper position when switching off schedule
+                    #    c.switch(sw)
                 except (ValueError, TimeoutException, SerialException) as reason:
-                    error("Error in apply_control_to_circle failed to switch schedule: %s" % (reason,))
+                    error("Error in apply_schedstate_to_circle failed to switch schedule: %s" % (reason,))
                     return False
                 switched = True
+                #update the switch_state
+                
         else:
             error('invalid schedule_state value in controls file')
         return switched
@@ -724,8 +744,8 @@ class PWControl(object):
                 if val == "on" or val == "off":
                     control['switch_state'] = val
                     updated = self.apply_switch_to_circle(control, mac, source)
-                    #switch command overrides schedule_state setting
-                    control['schedule_state'] = "off"
+                    ##switch command overrides schedule_state setting
+                    #control['schedule_state'] = "off"
                 else:
                     error("MQTT command has invalid value %s" % (val,))
             elif cmd == "schedule":
@@ -861,7 +881,7 @@ class PWControl(object):
                     #last = 6016
                     #TODO: correct if needed
                     last = 6015
-            #read maximum 100 positions at a time for responisveness and robustness for communication errors
+            #read maximum 100 positions at a time for responsiveness and robustness for communication errors
             if last > first + 100:
                 last = first + 100
             log = []
