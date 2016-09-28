@@ -379,6 +379,7 @@ class Circle(object):
         retd["online"] = self.online
         retd["lastseen"] = self.last_seen
         retd["readonly"] = (self.attr['always_on'] != 'False')
+        retd["reverse_pol"] = (self.attr['reverse_pol'] != 'False')
         retd["switch"] = self.relay_state
         retd["switchreq"] = self.switch_state
         retd["schedule"] = self.schedule_state
@@ -564,9 +565,16 @@ class Circle(object):
         debug("POWER:          1h: %.3f" % (kw_1h,))
         kw_p_1h = 1000*self.pulses_to_kWs(self.pulse_correction(pulse_prod_1h, 3600))/3600.0
         debug("POWER:     prod 1h: %.3f" % (kw_p_1h,))
+        if 'reverse_pol' in self.attr and self.attr['reverse_pol']:
+            kw_1s = -kw_1s 
+            kw_8s = -kw_8s
+            kw_1h = -kw_1h
+            kw_p_1h = -kw_p_1h
+            debug("get_power_usage: reverse polarity of %s" % (self.mac,))
         self.power = [kw_1s, kw_8s, kw_1h, kw_p_1h]
         self.power_ts = calendar.timegm(datetime.datetime.utcnow().utctimetuple())
         #just return negative values. It is production
+
         return (kw_1s, kw_8s, kw_1h, kw_p_1h)
 
     def get_info(self):
@@ -728,6 +736,11 @@ class Circle(object):
             corrected_pulses = self.pulse_correction(pulses[i], intervals[i])
             watt = self.pulses_to_kWs(corrected_pulses)/intervals[i]*1000
             watthour = self.pulses_to_kWs(corrected_pulses)/3600*1000
+            if 'reverse_pol' in self.attr and self.attr['reverse_pol']:
+                watt = -watt 
+                watthour = -watthour
+                debug("get_power_usage_history: reverse polarity of %s" % (self.mac,))
+
             retl.append((dts[i], watt, watthour))
         return retl
 

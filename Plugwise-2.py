@@ -162,6 +162,8 @@ class PWControl(object):
             for key in item:
                 if isinstance(item[key],str): item[key] = item[key].strip()
             item['mac'] = item['mac'].upper()
+            if 'reverse_pol' not in item:
+                item['reverse_pol'] = False
             self.bymac[item.get('mac')]=i
             self.byname[item.get('name')]=i
             #exception handling timeouts done by circle object for init
@@ -1272,7 +1274,8 @@ class PWControl(object):
         except:
             error("PWControl.run(): Communication error in enable_joining")
 
-        logrecs = True
+        # logrecs = True
+        logrecsn = len(self.circles)
         while 1:
             #check whether user defined configuration has been changed
             #when schedules are changed, this call can take over ten seconds!
@@ -1304,7 +1307,9 @@ class PWControl(object):
             
             #read historic data only one circle per minute
             if minute != prev_minute:
-                logrecs = True
+                # logrecs = True
+                if logrecsn == 0:
+                    logrecsn = len(self.circles)
             
             #get relays state just after each new quarter hour for circles operating a schedule.
             if minute % 15 == 0 and now.second > 8:
@@ -1321,7 +1326,7 @@ class PWControl(object):
             self.log_status()
             if hour != prev_hour:
                 #self.hourly()
-                logrecs = True
+                #logrecs = True
                 #self.log_recordings()
                 self.rsync_to_persistent()
                 if hour == 4:
@@ -1338,19 +1343,26 @@ class PWControl(object):
                 #self.daily()
                 self.cleanup_tmp()
                 
-            #Hourly log_recordings. Process one every ten seconds
-            if logrecs:
-                breaked = False
-                for c in self.circles:
-                    idx=self.controlsbymac[c.mac]
-                    if self.log_recording(self.controls[idx], c.mac):
-                        #actual recordings written to logfile
-                        #allow next circle to be logged in next ten seconds.
-                        breaked = True
-                        break
-                if not breaked:
-                    #all circles have been processed
-                    logrecs = False
+            # #log_recordings. Process one every ten seconds
+            # if logrecs:
+                # breaked = False
+                # for c in self.circles:
+                    # idx=self.controlsbymac[c.mac]
+                    # if self.log_recording(self.controls[idx], c.mac):
+                        # #actual recordings written to logfile
+                        # #allow next circle to be logged in next ten seconds.
+                        # breaked = True
+                        # break
+                # if not breaked:
+                    # #all circles have been processed
+                    # logrecs = False
+            
+            #log_recordings. Process one every ten seconds
+            if logrecsn > 0:
+                c = self.circles[logrecsn - 1]
+                idx=self.controlsbymac[c.mac]
+                self.log_recording(self.controls[idx], c.mac)
+                logrecsn = logrecsn - 1
             
             #update schedules after change in DST. Update one every ten seconds
             for c in self.circles:
