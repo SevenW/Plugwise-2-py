@@ -865,6 +865,9 @@ class PWControl(object):
             last = c_info['last_logaddr']
             first = c.last_log
             idx = c.last_log_idx
+            if idx == 4:
+                idx = 0
+                first = first + 1
             if c.last_log_ts != 0:
                 last_dt = datetime.utcfromtimestamp(c.last_log_ts)-timedelta(seconds=time.timezone)
             else:
@@ -884,8 +887,8 @@ class PWControl(object):
                     #TODO: correct if needed
                     last = 6015
             #read maximum 100 positions at a time for responsiveness and robustness for communication errors
-            if last > first + 100:
-                last = first + 100
+            if last > first + 99:
+                last = first + 99
             log = []
             try:
                 #read one more than request to determine interval of first measurement
