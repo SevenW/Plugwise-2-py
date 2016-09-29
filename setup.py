@@ -5,12 +5,7 @@ from setuptools import setup, find_packages
 
 VERSION = '2.0'
 
-install_reqs = ['crcmod', 'paho-mqtt']
-
-if sys.version_info < (3, 0):
-    install_reqs.append('pyserial')
-else:
-    install_reqs.append('pyserial-py3k')
+install_reqs = ['crcmod', 'paho-mqtt', 'pyserial']
 
 setup(name='plugwise2py', 
     version=VERSION,
