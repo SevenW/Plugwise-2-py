@@ -12,6 +12,7 @@ Plugwise-2-py
 - Robust matching of commands and replies in Zigbee communication.
 - Openhab interface through MQTT.
 - Domoticz interface through MQTT.
+- Homey interface through MQTT.
 
 ##Introduction
 Plugwise-2-py evolved in a monitoring and control server for plugwise devices.
@@ -107,7 +108,7 @@ the log level can be programmed in pw-control.json. Changes are picked up latest
 
 `"log_level": "info"` can have values error, info, debug
 
-`"log_comm": "no"` can have values no and yes. 
+`"log_comm": "no"` can have values no and yes.
 
 log_comm results in logging to  pw-communications.log, in the log folder specified through log_path in pw-hostconfig.json
 
@@ -232,4 +233,10 @@ Domoticz
 A MQTT to HTTP commands interface (using Node-Red) has been developed:
 https://www.domoticz.com/forum/viewtopic.php?f=14&t=7420&sid=22502c728a9a4f7d5ac93e6f5c0642a9
 
-I am investigating a more direct MQTT to Domoticz interface currently. 
+I am investigating a more direct MQTT to Domoticz interface currently.
+
+Homey
+--------
+A Homey app is available in the appstore: https://apps.athom.com/app/com.gruijter.plugwise2py
+
+For further instructions please visit https://forum.athom.com/discussion/1998
