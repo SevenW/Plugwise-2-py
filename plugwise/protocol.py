@@ -1,4 +1,4 @@
-# Copyright (C) 2012,2013,2014,2015 Seven Watt <info@sevenwatt.com>
+# Copyright (C) 2012,2013,2014,2015,2016 Seven Watt <info@sevenwatt.com>
 # <http://www.sevenwatt.com>
 #
 # This file is part of Plugwise-2-py.
@@ -656,7 +656,7 @@ class PlugwiseClockSetRequest(PlugwiseRequest):
         month_minutes = (passed_days*24*60)+(dt.hour*60)+dt.minute
         d = DateTime(dt.year, dt.month, month_minutes)
         t = Time(dt.hour, dt.minute, dt.second)
-        day_of_week = Int(dt.weekday(), 2)
+        day_of_week = Int(dt.weekday() + 1, 2)
         # FIXME: use LogAddr instead
         log_buf_addr = String('FFFFFFFF', 8)
         self.args += [d, log_buf_addr, t, day_of_week]
@@ -709,7 +709,7 @@ class PlugwiseSetDateTimeRequest(PlugwiseRequest):
         self.args.append(StringVal(dt.second, 2))
         self.args.append(StringVal(dt.minute, 2))
         self.args.append(StringVal(dt.hour, 2))
-        self.args.append(StringVal(dt.weekday(), 2))
+        self.args.append(StringVal(dt.weekday() + 1, 2))
         self.args.append(StringVal(dt.day, 2))
         self.args.append(StringVal(dt.month, 2))
         self.args.append(StringVal((dt.year-PLUGWISE_EPOCH), 2))

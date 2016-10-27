@@ -1,6 +1,6 @@
 #!/bin/env python
 
-# Copyright (C) 2012,2013,2014,2015 Seven Watt <info@sevenwatt.com>
+# Copyright (C) 2012,2013,2014,2015,2016 Seven Watt <info@sevenwatt.com>
 # <http://www.sevenwatt.com>
 #
 # This file is part of Plugwise-2-py.
@@ -28,7 +28,6 @@
 #   - return more reasonable responses than response message objects from the functions that don't do so yet
 #   - make message construction syntax better. Fields should only be specified once and contain name so we can serialize response message to dict
 #   - unit tests
-#   - pairing
 #   - support for older firmware versions
 
 import re
@@ -818,6 +817,8 @@ class Circle(object):
             info("circle.load_schedule. enter function")
             self.schedule._dst_shift(dst)
             #TODO: add test on inequality of CRC
+            
+            #info("schedule %s" % self.schedule._pulse)
             for idx in range(0,84):
                 chunk = self.schedule._pulse[(8*idx):(8*idx+8)]
                 req = PlugwisePrepareScheduleRequest(idx, chunk)
@@ -942,17 +943,23 @@ class Schedule(object):
     calibration data is required for conversion to pulses and CRC calculation
     """
     
-    def __init__(self, name, scheddata, convertor):
+    def __init__(self, name, scheddata, circle_w2p):
         """
         ......
         """
         self.name = str(name)
         self.dst = 0
         self._watt = scheddata
-        self._pulse = list(int(convertor(i)) if i>=0 else i for i in self._watt)
-        self._shift_day()
-        self._hex = ''.join(("%04X" % int_to_uint(i,4)) for i in self._pulse)
+        self._pulse = list(int(self.watt_to_pulses(circle_w2p, w)) if w>0 else w for w in self._watt)
+        #self._pulse = list(int(circle_w2p(i)) if i>0 else i for i in self._watt)
+        #self._shift_day()
         self.CRC = crc_fun(''.join(str(struct.pack('>h',i)) for i in self._pulse))
+        #self._hex = ''.join(("%04X" % int_to_uint(i,4)) for i in self._pulse)
+        
+    def watt_to_pulses(self, circle_w2p, watt):
+        #minimize at one pulse when watts is around 3 or lower.
+        pulses = circle_w2p(watt)
+        return pulses if pulses > 0 else 1
 
     def dump_status(self):
         retd = {}
@@ -961,11 +968,11 @@ class Schedule(object):
         retd['schedule'] = self._watt
         return retd
         
-    def _shift_day(self):
-        info("circle.schedule._shift_day rotate left by one day")
-        #rotate schedule a day to the left
-        self._pulse = self._pulse[96:]+self._pulse[:96]
-        #self.CRC = crc_fun(''.join(str(struct.pack('>h',i)) for i in self._pulse))
+    # def _shift_day(self):
+        # info("circle.schedule._shift_day rotate left by one day")
+        # #rotate schedule a day to the left
+        # self._pulse = self._pulse[96:]+self._pulse[:96]
+        # #self.CRC = crc_fun(''.join(str(struct.pack('>h',i)) for i in self._pulse))
 
     def _dst_shift(self, dst):
         if self.dst and not dst:

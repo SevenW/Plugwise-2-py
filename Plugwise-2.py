@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (C) 2012,2013,2014,2015 Seven Watt <info@sevenwatt.com>
+# Copyright (C) 2012,2013,2014,2015,2016 Seven Watt <info@sevenwatt.com>
 # <http://www.sevenwatt.com>
 #
 # This file is part of Plugwise-2-py.
