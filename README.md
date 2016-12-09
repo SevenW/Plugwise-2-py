@@ -240,3 +240,41 @@ Homey
 A Homey app is available in the appstore: https://apps.athom.com/app/com.gruijter.plugwise2py
 
 For further instructions please visit https://forum.athom.com/discussion/1998
+
+Home Assistant
+--------
+Interfacing with Home Assistant can be done through MQTT.
+
+Some examples:
+```
+sensor:
+ - platform: mqtt
+   name: Coffee
+   state_topic: 'plugwise2py/state/power/000D6F000XXXXXXX'
+   unit_of_measurement: 'W'
+   value_template: '{{ value_json.power }}'
+   sensor_class: power
+```
+```
+switch:
+ - platform: mqtt
+   name: Coffee
+   optimistic : false
+   command_topic: 'plugwise2py/cmd/switch/000D6F000XXXXXXX'
+   state_topic: 'plugwise2py/state/circle/000D6F000XXXXXXX'
+   value_template: '{"mac": "000D6F000XXXXXXX", "cmd": "switch", "val": "{{ value_json.switch }}"}'
+   payload_on: '{"mac": "000D6F000XXXXXXX", "cmd": "switch", "val": "on"}'
+   payload_off: '{"mac": "000D6F000XXXXXXX", "cmd": "switch", "val": "off"}'
+   retain: true
+```
+```
+binary_sensor:
+ - platform: mqtt
+   name: 'Plugwise Cicle Status for Coffee'
+   state_topic: 'plugwise2py/state/circle/000D6F000XXXXXXX'
+   sensor_class: connectivity
+   value_template: '{{ value_json.online }}'
+   payload_on: True
+   payload_off: False
+```
+
