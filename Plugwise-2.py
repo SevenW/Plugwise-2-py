@@ -1088,6 +1088,48 @@ class PWControl(object):
         control settings and switching schedule if needed.
         In case the circle was offline during initialization, a reinit is performed.
         """
+        #send a ping to all offline circles
+        for c in self.circles:
+            if not c.online:
+                try:
+                    c.ping()
+                except ValueError:
+                    continue
+                except (TimeoutException, SerialException) as reason:
+                    debug("Error in test_offline(): %s" % (reason,))
+                    continue
+        #reinitialize all circles that responded to ping
+        #likely it the ping was send in the previous call to test_offline
+        for c in self.circles:
+            if c.pong:
+                try:
+                    info("Circle %s in state pong. Bring to online." % (c.mac,))
+                    c.set_online()
+                    #back online. Make sure switch and schedule is ok
+                    if not c.initialized:
+                        c.reinit()
+                        self.set_interval_production(c)
+                    idx=self.controlsbymac[c.mac]
+                    self.apply_control_to_circle(self.controls[idx], c.mac)
+                except ValueError:
+                    continue
+                except (TimeoutException, SerialException) as reason:
+                    debug("Error in test_offline(): %s" % (reason,))
+                    continue
+        #publish circle state in case online state has just changed.
+        for c in self.circles:
+            if c.online_changed:
+                self.publish_circle_state(c.mac)
+                c.online_changed = False
+                                
+    def test_offline_synchronous(self):
+        """
+        When an unrecoverable communication failure with a circle occurs, the circle
+        is set online = False. This function will test on this condition and if offline,
+        it test whether it is available again, and if so, it will recover
+        control settings and switching schedule if needed.
+        In case the circle was offline during initialization, a reinit is performed.
+        """
         for c in self.circles:
             if not c.online:
                 try:
@@ -1104,6 +1146,11 @@ class PWControl(object):
                 except (TimeoutException, SerialException) as reason:
                     debug("Error in test_offline(): %s" % (reason,))
                     continue
+        #publish circle state in case online state has just changed.
+        for c in self.circles:
+            if c.online_changed:
+                self.publish_circle_state(c.mac)
+                c.online_changed = False
                                 
     def reset_all(self):
         #NOTE: Untested function, for example purposes
