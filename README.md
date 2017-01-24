@@ -13,6 +13,7 @@ Plugwise-2-py
 - Openhab interface through MQTT.
 - Domoticz interface through MQTT.
 - Homey interface through MQTT.
+- Home Assistant interface through MQTT.
 
 ##Introduction
 Plugwise-2-py evolved in a monitoring and control server for plugwise devices.
@@ -36,7 +37,6 @@ pw-control.json and schedules/*.json can be edited with the web application (see
 In the dynamic configuration:
 - logging of the in-circle integrated values can be enabled (usually the one-value-per-hour loggings.
 - logging of the actual power (production and or consumption) can  be logged. This value will be logged every 10 seconds.
-- switching schedules can be enabled and disabled.
 
 Finally the code implements several commands that have not been published before, at least not in 2012.
 
@@ -102,6 +102,9 @@ The default port is 1883.
 ##run:
 
 ```nohup python Plugwise-2.py >>/tmp/pwout.log&```
+
+##autostart:
+Plugwise-2-py and the web-server cna be automatically started with upstart in Ubuntu, or a cron job on the Raspberry pi. See instructions in the autostart-howto folder.
 
 ##debug:
 the log level can be programmed in pw-control.json. Changes are picked up latest after 10 seconds.
