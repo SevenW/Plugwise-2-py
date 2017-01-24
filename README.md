@@ -104,7 +104,7 @@ The default port is 1883.
 ```nohup python Plugwise-2.py >>/tmp/pwout.log&```
 
 ##autostart:
-Plugwise-2-py and the web-server cna be automatically started with upstart in Ubuntu, or a cron job on the Raspberry pi. See instructions in the autostart-howto folder.
+Plugwise-2-py and the web-server can be automatically started with upstart in Ubuntu, or a cron job on the Raspberry pi. See instructions in the `autostart-howto` folder.
 
 ##debug:
 the log level can be programmed in pw-control.json. Changes are picked up latest after 10 seconds.
