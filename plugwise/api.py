@@ -52,6 +52,8 @@ class Stick(SerialComChannel):
     """provides interface to the Plugwise Stick"""
 
     def __init__(self, port=0, timeout=DEFAULT_TIMEOUT):
+        self.circles = {} #dictionary {mac, circle} filled by circle init
+        self.last_counter = 0
         self.unjoined = set()
         SerialComChannel.__init__(self, port=port, timeout=timeout)
         if self.connected:
@@ -87,10 +89,20 @@ class Stick(SerialComChannel):
             print e
             info("SerialException during write - recovering. msg %s" % str(e))
             self.reconnect()
-        resp = self.expect_response(PlugwiseAckResponse)
-        success = False
-        if resp.status.value == 0xC1:
-            success = True
+        while 1:
+            resp = self.expect_response(PlugwiseAckResponse)
+            #test on sequence number, to be refined for wrap around
+            if (self.last_counter - int(resp.command_counter, 16) >= 0):
+                info("Seqnr already used in send_msg")
+            #in case a timeout on previous send occurs, then ignore here.
+            if resp.status.value == 0xE1:
+                info("Ignoring 0xE1 status in send_msg")
+                continue
+            success = False
+            if resp.status.value == 0xC1:
+                success = True
+            self.last_counter = int(resp.command_counter, 16)
+            break
         return (success, resp.command_counter)
 
     def _recv_response(self, retry_timeout=5):
@@ -181,8 +193,16 @@ class Stick(SerialComChannel):
                 error("protocol error [1]:"+str(reason))
             except OutOfSequenceException as reason:
                 #retry to receive the response
-                logcomm("RERR %4d %s - <!> out of sequence: %s" % ( len(msg), repr(msg), str(reason)))
-                error("protocol error [2]:"+str(reason))
+                #test ping response any offline circle
+                if resp.function_code == '000E':
+                    info("expect_response: out of sequence ping response")
+                    pingresp = PlugwisePingResponse()
+                    pingresp.unserialize(msg)
+                    circle = self.circles[resp.mac]
+                    circle.pong = True
+                else:
+                    logcomm("RERR %4d %s - <!> out of sequence: %s" % ( len(msg), repr(msg), str(reason)))
+                    error("protocol error [2]:"+str(reason))
             except UnexpectedResponse as reason:
                 #response could be an error status message
                 #suppress error logging when expecting a response to ping in case circle is offline
@@ -214,8 +234,16 @@ class Stick(SerialComChannel):
                         error("protocol error [3]:"+str(reason))
                     except OutOfSequenceException as reason:
                         #retry to receive the response
-                        logcomm("RERR %4d %s - <!> out of sequence while interpreting as Ack: %s" % ( len(msg), repr(msg), str(reason)))
-                        error("protocol error [4]:"+str(reason))
+                        #test ping response any offline circle
+                        if resp.function_code == '000E':
+                            info("expect_response while interpreting as Ack: out of sequence ping response")
+                            pingresp = PlugwisePingResponse()
+                            pingresp.unserialize(msg)
+                            circle = self.circles[resp.mac]
+                            circle.pong = True
+                        else:
+                            logcomm("RERR %4d %s - <!> out of sequence while interpreting as Ack: %s" % ( len(msg), repr(msg), str(reason)))
+                            error("protocol error [4]:"+str(reason))
                     except UnexpectedResponse as reason:
                         #response could be an error status message
                         logcomm("RERR %4d %s - <!> unexpected response error while interpreting as Ack: %s" % ( len(msg), repr(msg), str(reason)))
@@ -320,6 +348,7 @@ class Circle(object):
         #debug("mac %s" % (type(mac),))
 
         self._comchan = comchan
+        comchan.circles[self.mac] = self
         
         self.attr = attr
         
@@ -335,6 +364,8 @@ class Circle(object):
         
         self.joined = False
         self.online = False
+        self.online_changed = False
+        self.pong = False
         self.initialized = False
         self.relay_state = '?'
         self.switch_state = '?'
@@ -358,21 +389,32 @@ class Circle(object):
         
         self.reinit()
         
+    def set_online(self):
+        self.online = True
+        self.online_changed = True
+        self.pong = False
+
     def reinit(self):
         #self.get_info()  called by _get_interval
         try:
             self._get_interval()
             self.online = True
+            self.online_changed = True
             self.initialized = True
         except (ValueError, TimeoutException, SerialException, AttributeError) as reason:
             self.online = False
+            self.online_changed = True
             self.initialized = False
             error("OFFLINE Circle '%s' during initialization Error: %s" % (self.attr['name'], str(reason)))       
+        self.pong = False
 
     def get_status(self):
         retd = {}
         retd["mac"] = self.mac
-        retd["type"] = self.type()
+        if self._devtype is None:
+            retd["type"] = "unknown"
+        else:
+            retd["type"] = self._devtype
         retd["name"] = self.attr["name"]
         retd["location"] = self.attr["location"]
         retd["online"] = self.online
@@ -443,13 +485,28 @@ class Circle(object):
                 if self.online:
                     info("OFFLINE Circle '%s'." % (self.attr['name'],))
                 self.online = False
+                self.online_changed = True
+                self.pong = False
                 raise TimeoutException("Timeout while waiting for response from circle '%s'" % (self.attr['name'],))
             
+            # if not isinstance(resp, response_class):
+                # #error status returned
+                # if resp.status.value == 0xE1:
+                    # debug("Received an error status '%04X' from circle '%s' - Network slow or circle offline - Retry receive ..." % (resp.status.value, self.attr['name']))
+                    # retry_timeout = 1 #allow 1+1 seconds for timeout after an E1.
+                # else:
+                    # error("Received an error status '%04X' from circle '%s' with correct seqnr - Retry receive ..." % (resp.status.value, self.attr['name']))
             if not isinstance(resp, response_class):
                 #error status returned
                 if resp.status.value == 0xE1:
                     debug("Received an error status '%04X' from circle '%s' - Network slow or circle offline - Retry receive ..." % (resp.status.value, self.attr['name']))
-                    retry_timeout = 1 #allow 1+1 seconds for timeout after an E1.
+                    #retry_timeout = 1 #allow 1+1 seconds for timeout after an E1.
+                    if self.online:
+                        info("OFFLINE Circle '%s'." % (self.attr['name'],))
+                    self.online = False
+                    self.online_changed = True
+                    self.pong = False
+                    raise TimeoutException("Timeout while waiting for response from circle '%s'" % (self.attr['name'],))
                 else:
                     error("Received an error status '%04X' from circle '%s' with correct seqnr - Retry receive ..." % (resp.status.value, self.attr['name']))
             else:
@@ -457,6 +514,8 @@ class Circle(object):
                 if not self.online:
                     info("ONLINE  Circle '%s' after %d seconds." % (self.attr['name'], ts_now - self.last_seen))
                     self.online = True
+                    self.online_changed = True
+                    self.pong = False
                 #self.last_seen = (datetime.datetime.utcnow()-datetime.timedelta(seconds=time.timezone)).isoformat()
                 self.last_seen = ts_now
                 return resp
@@ -464,6 +523,8 @@ class Circle(object):
         if self.online:
             info("OFFLINE Circle '%s'." % (self.attr['name'],))
         self.online = False
+        self.online_changed = True
+        self.pong = False
         #TODO: Replace timeout exception by more specific exception
         raise TimeoutException("Received multiple error messages from circle '%s'" % (self.attr['name'],))
         
@@ -545,6 +606,7 @@ class Circle(object):
         """
         msg = PlugwisePowerUsageRequest(self.mac).serialize()
         _, seqnr  = self._comchan.send_msg(msg)
+        info("counters mac %s, seqnr %s" % (self.mac, seqnr))
         resp = self._expect_response(PlugwisePowerUsageResponse, seqnr)
         p1s, p8s, p1h, pp1h = resp.pulse_1s.value, resp.pulse_8s.value, resp.pulse_hour.value, resp.pulse_prod_hour.value
         if self.attr['production'] == 'False':
@@ -896,6 +958,14 @@ class Circle(object):
         self.interval = int(interval.total_seconds())/60
         
     def ping(self):
+        """ping circle
+        """
+        req = PlugwisePingRequest(self.mac)
+        _, seqnr  = self._comchan.send_msg(req.serialize())
+        info("pinged mac %s, seqnr %s" % (self.mac, seqnr))
+        return #self._expect_response(PlugwisePingResponse, seqnr)
+
+    def ping_synchronous(self):
         """ping circle
         """
         req = PlugwisePingRequest(self.mac)
