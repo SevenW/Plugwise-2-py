@@ -1,6 +1,6 @@
 #!/bin/env python
 
-# Copyright (C) 2012,2013,2014,2015,2016 Seven Watt <info@sevenwatt.com>
+# Copyright (C) 2012,2013,2014,2015,2016,2017 Seven Watt <info@sevenwatt.com>
 # <http://www.sevenwatt.com>
 #
 # This file is part of Plugwise-2-py.
@@ -93,10 +93,10 @@ class Stick(SerialComChannel):
             resp = self.expect_response(PlugwiseAckResponse)
             #test on sequence number, to be refined for wrap around
             if (self.last_counter - int(resp.command_counter, 16) >= 0):
-                info("Seqnr already used in send_msg")
+                debug("Seqnr already used in send_msg")
             #in case a timeout on previous send occurs, then ignore here.
             if resp.status.value == 0xE1:
-                info("Ignoring 0xE1 status in send_msg")
+                debug("Ignoring 0xE1 status in send_msg")
                 continue
             success = False
             if resp.status.value == 0xC1:
@@ -606,7 +606,7 @@ class Circle(object):
         """
         msg = PlugwisePowerUsageRequest(self.mac).serialize()
         _, seqnr  = self._comchan.send_msg(msg)
-        info("counters mac %s, seqnr %s" % (self.mac, seqnr))
+        debug("counters mac %s, seqnr %s" % (self.mac, seqnr))
         resp = self._expect_response(PlugwisePowerUsageResponse, seqnr)
         p1s, p8s, p1h, pp1h = resp.pulse_1s.value, resp.pulse_8s.value, resp.pulse_hour.value, resp.pulse_prod_hour.value
         if self.attr['production'] == 'False':
@@ -962,7 +962,7 @@ class Circle(object):
         """
         req = PlugwisePingRequest(self.mac)
         _, seqnr  = self._comchan.send_msg(req.serialize())
-        info("pinged mac %s, seqnr %s" % (self.mac, seqnr))
+        debug("pinged mac %s, seqnr %s" % (self.mac, seqnr))
         return #self._expect_response(PlugwisePingResponse, seqnr)
 
     def ping_synchronous(self):

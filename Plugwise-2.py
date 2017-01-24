@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (C) 2012,2013,2014,2015,2016 Seven Watt <info@sevenwatt.com>
+# Copyright (C) 2012,2013,2014,2015,2016,2017 Seven Watt <info@sevenwatt.com>
 # <http://www.sevenwatt.com>
 #
 # This file is part of Plugwise-2-py.
@@ -412,13 +412,16 @@ class PWControl(object):
         """
         updated = self.apply_schedule_to_circle(control, mac, force)
         c = self.circles[self.bymac[mac]]
-        debug('circle mac: %s before1 - state [r,sw,sc] %s %s %s - scname %s' % (mac, c.relay_state, control['switch_state'], control['schedule_state'], control['schedule']))
-        debug('circle mac: %s before2 - state [r,sw,sc] %s %s %s' % (c.mac, c.relay_state, c.switch_state, c.schedule_state))
-        source = "internal"
-        updated = updated | self.apply_schedstate_to_circle(control, mac, source, force)
-        if control['schedule_state'] != 'on':
-            updated = updated | self.apply_switch_to_circle(control, mac, source, force)
-        #old approach to schedules
+        
+        #no longer support setting the switch and schedule state on/off from the control json file.
+        #debug('circle mac: %s before1 - state [r,sw,sc] %s %s %s - scname %s' % (mac, c.relay_state, control['switch_state'], control['schedule_state'], control['schedule']))
+        #debug('circle mac: %s before2 - state [r,sw,sc] %s %s %s' % (c.mac, c.relay_state, c.switch_state, c.schedule_state))
+        #source = "internal"
+        #updated = updated | self.apply_schedstate_to_circle(control, mac, source, force)
+        #if control['schedule_state'] != 'on':
+        #    updated = updated | self.apply_switch_to_circle(control, mac, source, force)
+        
+        #very old approach to schedules
         #comment out code
         # else:
             # #prime the switch state for consistency between circle and control
@@ -432,8 +435,9 @@ class PWControl(object):
             
         if updated:
             self.publish_circle_state(mac)
-        debug('circle mac: %s after1 - state [r,sw,sc] %s %s %s - scname %s' % (mac, c.relay_state, control['switch_state'], control['schedule_state'], control['schedule']))
-        debug('circle mac: %s after2 - state [r,sw,sc] %s %s %s' % (c.mac, c.relay_state, c.switch_state, c.schedule_state))
+            
+        #debug('circle mac: %s after1 - state [r,sw,sc] %s %s %s - scname %s' % (mac, c.relay_state, control['switch_state'], control['schedule_state'], control['schedule']))
+        #debug('circle mac: %s after2 - state [r,sw,sc] %s %s %s' % (c.mac, c.relay_state, c.switch_state, c.schedule_state))
 
 
     def apply_schedule_to_circle(self, control, mac, force=False):
@@ -491,10 +495,16 @@ class PWControl(object):
                 if  c.schedule.CRC != c.scheduleCRC or c.schedule.dst != time.localtime().tm_isdst:
                     info('circle mac: %s needs schedule to be uploaded' % (mac,))
                     try:
+                        #only change schedules when schedule_state = off
+                        #save current state
+                        act_state = c.schedule_state
                         c.schedule_off()
                         c.load_schedule(time.localtime().tm_isdst)
                         #update scheduleCRC
                         c.get_clock()
+                        #restore previous state
+                        if act_state == 'on':
+                            c.schedule_on()
                     except (ValueError, TimeoutException, SerialException) as reason:
                         error("Error in apply_control_to_circle load_schedule: %s" % (reason,))
                         return False
@@ -551,6 +561,7 @@ class PWControl(object):
         c.requid = source
         
         #force schedule_state to off when no schedule is defined
+        #keep writing state to control file, but no longer support applying switch/schedule state on/off
         if ((not control['schedule']) or control['schedule'] == "") and control['schedule_state'].lower() == 'on':
             control['schedule_state'] = 'off'
             info('circle mac: %s schedule forced to off because no schedule defined' % (mac,))
@@ -1105,7 +1116,7 @@ class PWControl(object):
                 try:
                     info("Circle %s in state pong. Bring to online." % (c.mac,))
                     c.set_online()
-                    #back online. Make sure switch and schedule is ok
+                    #back online. Make sure the most recent settings are applied
                     if not c.initialized:
                         c.reinit()
                         self.set_interval_production(c)
@@ -1135,7 +1146,7 @@ class PWControl(object):
                 try:
                     c.ping()
                     if c.online:
-                        #back online. Make sure switch and schedule is ok
+                        #back online. Make sure the most recent settings are applied
                         if not c.initialized:
                             c.reinit()
                             self.set_interval_production(c)
