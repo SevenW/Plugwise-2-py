@@ -745,7 +745,7 @@ class PWControl(object):
         #write control file for testing purposes
         fjson = open("config/pw-control.json", 'w')
         self.controlsjson['dynamic'] = self.controls
-        json.dump(self.controlsjson, fjson)
+        json.dump(self.controlsjson, fjson, indent=4)
         fjson.close()
      
     def ten_seconds(self):
