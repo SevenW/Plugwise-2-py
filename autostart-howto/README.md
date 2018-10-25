@@ -37,3 +37,44 @@ crontab -e
 # At the end of the crontab file add this line:
 #    @reboot /home/pi/Plugwise-2-py/PW2py_bootstart.sh
 ```
+
+##3. Systemd
+Systemd service files for Plugwise can be placed in `/etc/systemd/system`.
+In the examples below, plugwise-web.service will start and stop together with plugwise.service using `BindsTo`.
+
+Replace the references to user `pi` and `/home/pi` below with the respective user/path you are using.
+
+`plugwise.service`:
+```
+[Unit]
+Description=Plugwise
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+ExecStart=/usr/bin/python /home/pi/Plugwise-2-py/Plugwise-2.py
+WorkingDirectory=/home/pi/Plugwise-2-py
+
+[Install]
+WantedBy=multi-user.target
+```
+
+`plugwise-web.service`:
+```
+[Unit]
+Description=Plugwise Web
+After=network.target plugwise.service
+BindsTo=plugwise.service
+
+[Service]
+Type=simple
+User=pi
+ExecStart=/usr/bin/python /home/pi/Plugwise-2-py/Plugwise-2-web.py
+WorkingDirectory=/home/gerben/Plugwise-2-py
+
+[Install]
+WantedBy=multi-user.target
+```
+
+After creating the service files, run `systemctl daemon-reload` and then enable them with `systemctl enable plugwise.service` and `systemctl enable plugwise-web.service`. Starting/stopping is done with `systemctl start plugwise` or `systemctl stop plugwise`
