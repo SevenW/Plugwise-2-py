@@ -66,7 +66,6 @@ class Stick(SerialComChannel):
         msg = PlugwiseStatusRequest().serialize()
         self.send_msg(msg)
         resp = self.expect_response(PlugwiseStatusResponse)
-        print resp.mac
         if not resp.circleplusmac is None:
             self.circleplusmac = "00"+resp.circleplusmac.serialize()
         debug(str(resp))
