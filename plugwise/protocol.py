@@ -495,13 +495,15 @@ class PlugwiseStatusResponse(PlugwiseResponse):
         PlugwiseResponse.__init__(self, seqnr)
         self.unknown = Int(0, length=2)
         self.network_is_online = Int(0, length=2)
-        self.network_id = Int(0, length=16)
+        self.unknown = Int(0, length=2)
+        self.circleplusmac = String(None, length=14)
         self.network_id_short = Int(0, length=4)
         self.unknown = Int(0, length=2)
         self.params += [
             self.unknown,
             self.network_is_online,
-            self.network_id,
+            self.unknown,
+            self.circleplusmac,
             self.network_id_short,
             self.unknown,
         ]

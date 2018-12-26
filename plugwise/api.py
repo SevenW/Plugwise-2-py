@@ -52,6 +52,8 @@ class Stick(SerialComChannel):
     """provides interface to the Plugwise Stick"""
 
     def __init__(self, port=0, timeout=DEFAULT_TIMEOUT):
+        self.mac = None
+        self.circleplusmac = None
         self.circles = {} #dictionary {mac, circle} filled by circle init
         self.last_counter = 0
         self.unjoined = set()
@@ -64,6 +66,9 @@ class Stick(SerialComChannel):
         msg = PlugwiseStatusRequest().serialize()
         self.send_msg(msg)
         resp = self.expect_response(PlugwiseStatusResponse)
+        print resp.mac
+        if not resp.circleplusmac is None:
+            self.circleplusmac = "00"+resp.circleplusmac.serialize()
         debug(str(resp))
 
     def reconnect(self):
@@ -309,6 +314,8 @@ class Stick(SerialComChannel):
         #The short reponse occurs when no cirlceplus is connected, and has two byte parameters.
         #The short repsonse is likely not properly handled (exception?)
         resp = self.expect_response(PlugwiseStatusResponse)
+        if not resp.circleplusmac is None:
+            self.circleplusmac = "00"+resp.circleplusmac.serialize()
         return        
         
     def find_circleplus(self):
@@ -326,7 +333,7 @@ class Stick(SerialComChannel):
         return success,circleplusmac
 
     def connect_circleplus(self):
-        req = PlugwiseConnectCirclePlusRequest(self.mac)
+        req = PlugwiseConnectCirclePlusRequest(self.circleplusmac)
         _, seqnr  = self.send_msg(req.serialize())
         resp = self.expect_response(PlugwiseConnectCirclePlusResponse)
         return resp.existing.value, self.allowed.value        
