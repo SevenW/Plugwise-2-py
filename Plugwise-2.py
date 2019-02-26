@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 # Copyright (C) 2012,2013,2014,2015,2016,2017 Seven Watt <info@sevenwatt.com>
 # <http://www.sevenwatt.com>
@@ -31,6 +32,7 @@ from swutil.pwmqtt import *
 from plugwise.api import *
 
 from datetime import datetime, timedelta
+#import datetime
 import time
 import calendar
 import subprocess
@@ -1028,7 +1030,7 @@ class PWControl(object):
             #just set this several years back. Circles may have been unplugged for a while
             fileopen = False
             f = None
-            prev_dt = datetime.now()-timedelta(days=2000)
+            prev_dt = datetime(2000,1,1)
             for dt, watt, watt_hour in log:
                 if not dt is None:                
                     #calculate cumulative energy in Wh

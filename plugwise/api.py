@@ -351,6 +351,8 @@ class Circle(object):
         comchan.circles[self.mac] = self
         
         self.attr = attr
+        #Fix 'swedish' characters
+        self.attr['name'] = self.attr['name'].encode('utf-8')
         
         self._devtype = None
 
