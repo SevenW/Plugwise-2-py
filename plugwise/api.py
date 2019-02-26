@@ -395,9 +395,12 @@ class Circle(object):
         self.pong = False
 
     def reinit(self):
-        #self.get_info()  called by _get_interval
         try:
-            self._get_interval()
+            info = self.get_info()
+            cur_idx = info['last_logaddr']
+            self._get_interval(cur_idx)
+            if self.attr['always_on'] != 'False' and self.relay_state == 'off':
+                self.switchon()
             self.online = True
             self.online_changed = True
             self.initialized = True
@@ -660,9 +663,6 @@ class Circle(object):
         retd['type'] = self.map_type(retd['type'])
         retd['relay_state'] = relay(retd['relay_state'])
         self.relay_state = retd['relay_state']
-        if self.attr['always_on'] != 'False' and self.relay_state == 'off':
-            return False
-        
         return retd
 
     def get_clock(self):
@@ -935,12 +935,10 @@ class Circle(object):
         #status = '00FA'
         
         
-    def _get_interval(self):
+    def _get_interval(self, cur_idx):
         self.interval=60
         self.usage=True
         self.production=False
-        info = self.get_info()
-        cur_idx = info['last_logaddr']
         if cur_idx < 1:
             return
         log = self.get_power_usage_history(cur_idx)
