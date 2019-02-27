@@ -52,6 +52,7 @@ class Stick(SerialComChannel):
     """provides interface to the Plugwise Stick"""
 
     def __init__(self, port=0, timeout=DEFAULT_TIMEOUT):
+        self._devtype = 0 # Stick
         self.pan = None
         self.short_pan = None
         self.mac = None
@@ -298,7 +299,7 @@ class Stick(SerialComChannel):
 
     def reset(self):
         type = 0
-        req = PlugwiseResetRequest(self.mac, type, 20)
+        req = PlugwiseResetRequest(self.mac, self._devtype, 20)
         _, seqnr  = self.send_msg(req.serialize())
         resp = self.expect_response(PlugwiseAckMacResponse)
         return resp.status.value
@@ -319,7 +320,7 @@ class Stick(SerialComChannel):
         return resp.network_is_online
         
     def find_circleplus(self):
-        req = PlugwiseQueryCirclePlusRequest(self.mac)
+        req = PlugwiseQueryCirclePlusRequest()
         _, seqnr  = self.send_msg(req.serialize())
         #Receive the circle+ response, but possibly, only an end-protocol response is seen.
         success = False
