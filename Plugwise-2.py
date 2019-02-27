@@ -1206,7 +1206,7 @@ class PWControl(object):
             #try to locate a circleplus on the network    
             #0001/0002/0003 request/responses
             try:
-                success,cpmac = self.device.find_circleplus()
+                success = self.device.find_circleplus()
             except:
                 #Not sure whether something should be handled
                 pass
