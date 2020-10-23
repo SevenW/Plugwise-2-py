@@ -76,7 +76,7 @@ class Stick(SerialComChannel):
             time.sleep(1)
             self.reopen()
         except Exception as e:
-            print(e)      
+            print e      
             error("Error: %s" % str(e),) 
         #if init raises an exception, let the application handle it.
         if self.connected:
@@ -88,7 +88,7 @@ class Stick(SerialComChannel):
         try:
             self.write(cmd)
         except SerialException as e:
-            print(e)
+            print e
             info("SerialException during write - recovering. msg %s" % str(e))
             self.reconnect()
         while 1:
@@ -115,7 +115,7 @@ class Stick(SerialComChannel):
             try:
                 msg += self.readline()
             except SerialException as e:
-                print(e)
+                print e
                 info("SerialException during readline - recovering. msg %s" % str(e))
                 self.reconnect()
             # if msg == b"":

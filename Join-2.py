@@ -37,7 +37,7 @@ import subprocess
 import glob
 import os
 import logging
-import Queue
+import queue
 import threading
 import itertools
 
@@ -46,7 +46,7 @@ try:
     import paho.mqtt.client as mosquitto
 except:
     mqtt = False
-print mqtt
+print(mqtt)
 
 import pprint as pp
 import json
@@ -69,7 +69,7 @@ perpath = cfg['permanent_path']+'/'
 logpath = cfg['log_path']+'/'
 port = cfg['serial']
 epochf = False
-if cfg.has_key('log_format') and cfg['log_format'] == 'epoch':
+if 'log_format' in cfg and cfg['log_format'] == 'epoch':
     epochf = True
     
 actdir = 'pwact/'
@@ -372,11 +372,11 @@ class PWControl(object):
             self.controlsbymac[item['mac']]=i
             i += 1
         #set log settings
-        if controls.has_key('log_comm'):
+        if 'log_comm' in controls:
             log_comm(str(controls['log_comm']).strip().lower() == 'yes')
             info("COMMU with str() %s" % (str(controls['log_comm']).strip().lower() == 'yes',))
             info("COMMU with u %s" % (controls['log_comm'].strip().lower() == 'yes',))
-        if controls.has_key('log_level'):
+        if 'log_level' in controls:
             if str(controls['log_level']).strip().lower() == 'debug':
                 log_level(logging.DEBUG)
             elif str(controls['log_level']).strip().lower() == 'info':
@@ -387,7 +387,7 @@ class PWControl(object):
                 log_level(logging.INFO)
         
         self.controls =  newcontrols
-        for mac, idx in self.controlsbymac.iteritems():
+        for mac, idx in self.controlsbymac.items():
             self.apply_control_to_circle(self.controls[idx], mac, force=False)
            
         return
@@ -526,7 +526,7 @@ class PWControl(object):
             info("mac from controls not found in circles")
             return False
         if not c.online:
-            print "offline"
+            print("offline")
             return False
         switched = False
         
@@ -566,7 +566,7 @@ class PWControl(object):
         global actpost
         
         #close all open act files
-        for m, f in self.actfiles.iteritems():
+        for m, f in self.actfiles.items():
             f.close()
         #open actfiles according to (new) config
         self.actfiles = dict()
@@ -578,7 +578,7 @@ class PWControl(object):
         yrfold = str(now.year)+'/'
         if not os.path.exists(tmppath+yrfold+actdir):
             os.makedirs(tmppath+yrfold+actdir)
-        for mac, idx in self.controlsbymac.iteritems():
+        for mac, idx in self.controlsbymac.items():
             if self.controls[idx]['monitor'].lower() == 'yes':
                 fname = tmppath + yrfold + actdir + actpre + today + '-' + mac + actpost
                 f = open(fname, 'a')
@@ -645,8 +645,8 @@ class PWControl(object):
     def test_mtime(self, before, after):
         modified = []
         if after:
-            for (bf,bmod) in before.items():
-                if (after.has_key(bf) and after[bf] > bmod):
+            for (bf,bmod) in list(before.items()):
+                if (bf in after and after[bf] > bmod):
                     modified.append(bf)
         return modified
      
@@ -655,8 +655,8 @@ class PWControl(object):
         before = self.schedulesstat
         try:
             after = dict ((f, os.path.getmtime(f)) for f in glob.glob(schedules_path+'/*.json'))
-            added = [f for f in after.keys() if not f in before.keys()]
-            removed = [f for f in before.keys() if not f in after.keys()]
+            added = [f for f in list(after.keys()) if not f in list(before.keys())]
+            removed = [f for f in list(before.keys()) if not f in list(after.keys())]
             modified = self.test_mtime(before,after)
             if (added or removed or modified):
                 self.schedules = self.read_schedules()
@@ -756,7 +756,7 @@ class PWControl(object):
         """
         self.curfile.seek(0)
         self.curfile.truncate(0)
-        for mac, f in self.actfiles.iteritems():
+        for mac, f in self.actfiles.items():
             try:
                 c = self.circles[self.bymac[mac]]                
             except:
@@ -1042,28 +1042,28 @@ class PWControl(object):
                                 
     def reset_all(self):
         #NOTE: Untested function, for example purposes
-        print "Untested function, for example purposes"
-        print "Aborting. Remove next line to continue"
+        print("Untested function, for example purposes")
+        print("Aborting. Remove next line to continue")
         krak
         #
         #TODO: Exception handling
         for c in self.circles:
             if c.attr['name'] != 'circle+':
-                print 'resetting '+c.attr['name']
+                print('resetting '+c.attr['name'])
                 c.reset()
         for c in self.circles:
             if c.attr['name'] == 'circle+':
-                print 'resetting '+c.attr['name']
+                print('resetting '+c.attr['name'])
                 c.reset()
-        print 'resetting stick'
+        print('resetting stick')
         self.device.reset()
-        print 'sleeping 60 seconds to allow devices to be reset themselves'
+        print('sleeping 60 seconds to allow devices to be reset themselves')
         time.sleep(60)
 
     def init_network(self):
         #NOTE: Untested function, for example purposes
-        print "Untested function, for example purposes"
-        print "Aborting. Remove next line to continue"
+        print("Untested function, for example purposes")
+        print("Aborting. Remove next line to continue")
         krak
         #TODO: Exception handling        
         #
@@ -1077,7 +1077,7 @@ class PWControl(object):
             pass
         success = False
         for i in range(0,10):
-            print "Trying to connect to circleplus ..."
+            print("Trying to connect to circleplus ...")
             #try to locate a circleplus on the network    
             #0001/0002/0003 request/responses
             try:
@@ -1102,7 +1102,7 @@ class PWControl(object):
                     break
                 except:
                     success = False
-            print "sleep 30 seconds for next retry ..."
+            print("sleep 30 seconds for next retry ...")
             time.sleep(30)
 
     def connect_node_by_mac(self, newnodemac):
@@ -1114,7 +1114,7 @@ class PWControl(object):
         #nodes can also be removed from the table with methods:
         #     cp.remove_node('mac'), where cp is the circleplus object.
         #for demonstrative purposes read and print the table
-        print self.circles[0].read_node_table()
+        print(self.circles[0].read_node_table())
       
         #Inform network that nodes are allowed to join the network
         #Nodes may start advertising themselves with a 0006 message.
@@ -1130,15 +1130,15 @@ class PWControl(object):
         #
         #test the node, assuming it is already in the configuration files
         try:
-            print self.circles[self.bymac[newnodemac]].get_info()
+            print(self.circles[self.bymac[newnodemac]].get_info())
         except:
-            print 'new node not detected ...'        
+            print('new node not detected ...')        
         #
         #end the joining process
         self.device.enable_joining(False)
         #
         #Finally read and print the table of nodes again
-        print self.circles[0].read_node_table()
+        print(self.circles[0].read_node_table())
 
         
     def connect_unknown_nodes(self):
@@ -1307,14 +1307,14 @@ log_level(logging.DEBUG)
 log_comm(True)
 
 try:
-    qpub = Queue.Queue()
-    qsub = Queue.Queue()
+    qpub = queue.Queue()
+    qsub = queue.Queue()
     mqtt_t = None
     if  not mqtt:
         error("No MQTT python binding installed (mosquitto-python)")
-    elif cfg.has_key('mqtt_ip') and cfg.has_key('mqtt_port'):
+    elif 'mqtt_ip' in cfg and 'mqtt_port' in cfg:
         #connect to server and start worker thread.
-        if cfg.has_key('mqtt_user') and cfg.has_key('mqtt_password'):
+        if 'mqtt_user' in cfg and 'mqtt_password' in cfg:
             mqttclient = Mqtt_client(cfg['mqtt_ip'], cfg['mqtt_port'], qpub, qsub,"Plugwise-2-py",cfg['mqtt_user'],cfg['mqtt_password'])
         else:
             mqttclient = Mqtt_client(cfg['mqtt_ip'], cfg['mqtt_port'], qpub, qsub, "Plugwise-2-py")

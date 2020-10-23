@@ -11,12 +11,12 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 '''
 
-from http.server import SimpleHTTPRequestHandler
+from SimpleHTTPServer import SimpleHTTPRequestHandler
 import struct
 from base64 import b64encode
 from hashlib import sha1
 from mimetools import Message
-from io import StringIO
+from StringIO import StringIO
 import errno, socket #for socket exceptions
 import threading
 
@@ -66,7 +66,7 @@ class HTTPWebSocketsHandler(SimpleHTTPRequestHandler):
             SimpleHTTPRequestHandler.finish(self)
         except (socket.error, TypeError) as err:
             self.log_message("finish(): Exception: in SimpleHTTPRequestHandler.finish(): %s" % str(err.args))
-            print(("finish(): Exception: in SimpleHTTPRequestHandler.finish(): %s" % str(err.args)))
+            print("finish(): Exception: in SimpleHTTPRequestHandler.finish(): %s" % str(err.args))
         self.log_message("finish done on worker thread %d" % threading.current_thread().ident)
 
     def handle(self):
@@ -81,10 +81,10 @@ class HTTPWebSocketsHandler(SimpleHTTPRequestHandler):
             SimpleHTTPRequestHandler.handle(self)
         except (socket.error,) as err:
             self.log_message("handle(): Exception: in SimpleHTTPRequestHandler.handle(): %s" % str(err.args))
-            print(("handle(): Exception: in SimpleHTTPRequestHandler.handle(): %s" % str(err.args)))
+            print("handle(): Exception: in SimpleHTTPRequestHandler.handle(): %s" % str(err.args))
         except (TypeError,) as err:
             self.log_message("handle(): Exception: in SimpleHTTPRequestHandler.handle(): %s" % str(err))
-            print(("handle(): Exception: in SimpleHTTPRequestHandler.handle(): %s" % str(err)))
+            print("handle(): Exception: in SimpleHTTPRequestHandler.handle(): %s" % str(err))
         self.log_message("handle done on worker thread %d" % threading.current_thread().ident)
 
     def checkAuthentication(self):
@@ -122,7 +122,7 @@ class HTTPWebSocketsHandler(SimpleHTTPRequestHandler):
         while self.connected == True:
             try:
                 self._read_next_message()
-            except (socket.error, WebSocketError) as e:
+            except (socket.error, WebSocketError), e:
                 #websocket content error, time-out or disconnect.
                 self.log_message("RCV: Close connection: Socket Error %s" % str(e.args))
                 self._ws_close()
@@ -170,7 +170,7 @@ class HTTPWebSocketsHandler(SimpleHTTPRequestHandler):
                 self.request.send(struct.pack(">Q", length))
             if length > 0:
                 self.request.send(message)
-        except socket.error as e:
+        except socket.error, e:
             #websocket content error, time-out or disconnect.
             self.log_message("SND: Close connection: Socket Error %s" % str(e.args))
             self._ws_close()

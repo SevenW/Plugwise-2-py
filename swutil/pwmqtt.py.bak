@@ -2,7 +2,7 @@
 
 import paho.mqtt.client as mosquitto
 from .util import *
-import queue
+import Queue
 import time
 import os
 
@@ -84,7 +84,7 @@ class Mqtt_client(object):
             time.sleep(5)
             self.rc = self._connect()
             if self.connected():
-                for subscr in list(self.subscriptions.items()):
+                for subscr in self.subscriptions.items():
                     self.mqttc.subscribe(subscr[0], subscr[1])
                     info("MQTT subscribed to %s with qos %d" % (subscr[0], subscr[1]))
                 
