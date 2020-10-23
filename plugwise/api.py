@@ -52,6 +52,11 @@ class Stick(SerialComChannel):
     """provides interface to the Plugwise Stick"""
 
     def __init__(self, port=0, timeout=DEFAULT_TIMEOUT):
+        self._devtype = 0 # Stick
+        self.pan = None
+        self.short_pan = None
+        self.mac = None
+        self.circleplusmac = None
         self.circles = {} #dictionary {mac, circle} filled by circle init
         self.last_counter = 0
         self.unjoined = set()
@@ -61,10 +66,7 @@ class Stick(SerialComChannel):
 
     def init(self):
         """send init message to the stick"""
-        msg = PlugwiseStatusRequest().serialize()
-        self.send_msg(msg)
-        resp = self.expect_response(PlugwiseStatusResponse)
-        debug(str(resp))
+        self.status()
 
     def reconnect(self):
         """recover from disconnected serial device"""
@@ -297,36 +299,41 @@ class Stick(SerialComChannel):
 
     def reset(self):
         type = 0
-        req = PlugwiseResetRequest(self.mac, type, 20)
+        req = PlugwiseResetRequest(self.mac, self._devtype, 20)
         _, seqnr  = self.send_msg(req.serialize())
         resp = self.expect_response(PlugwiseAckMacResponse)
         return resp.status.value
 
     def status(self):
-        req = PlugwiseStatusRequest(self.mac)
+        req = PlugwiseStatusRequest()
         _, seqnr  = self.send_msg(req.serialize())
         #TODO: There is a short and a long response to 0011.
         #The short reponse occurs when no cirlceplus is connected, and has two byte parameters.
         #The short repsonse is likely not properly handled (exception?)
         resp = self.expect_response(PlugwiseStatusResponse)
-        return        
+        debug(str(resp))
+        self.mac = resp.mac
+        if resp.network_id !=  0:
+            self.pan = resp.network_id.serialize()
+            self.short_pan = resp.network_id_short.serialize()
+            self.circleplusmac = b'00'+resp.network_id.serialize()[2:]
+        return resp.network_is_online
         
     def find_circleplus(self):
-        req = PlugwiseQueryCirclePlusRequest(self.mac)
+        req = PlugwiseQueryCirclePlusRequest()
         _, seqnr  = self.send_msg(req.serialize())
         #Receive the circle+ response, but possibly, only an end-protocol response is seen.
         success = False
-        circleplusmac = None
         try:
             resp = self.expect_response(PlugwiseQueryCirclePlusResponse)
             success=True
-            circleplusmac = resp.new_node_mac_id.value
+            self.circleplusmac = resp.new_node_mac_id.serialize()
         except (TimeoutException, SerialException) as reason:
             error("Error: %s, %s" % (datetime.datetime.now().isoformat(), str(reason),))        
-        return success,circleplusmac
+        return success
 
     def connect_circleplus(self):
-        req = PlugwiseConnectCirclePlusRequest(self.mac)
+        req = PlugwiseConnectCirclePlusRequest(self.circleplusmac)
         _, seqnr  = self.send_msg(req.serialize())
         resp = self.expect_response(PlugwiseConnectCirclePlusResponse)
         return resp.existing.value, self.allowed.value        
@@ -351,6 +358,8 @@ class Circle(object):
         comchan.circles[self.mac] = self
         
         self.attr = attr
+        #Fix 'swedish' characters
+        self.attr['name'] = self.attr['name'].encode('utf-8')
         
         self._devtype = None
 
@@ -395,9 +404,12 @@ class Circle(object):
         self.pong = False
 
     def reinit(self):
-        #self.get_info()  called by _get_interval
         try:
-            self._get_interval()
+            info = self.get_info()
+            cur_idx = info['last_logaddr']
+            self._get_interval(cur_idx)
+            if self.attr['always_on'] != 'False' and self.relay_state == 'off':
+                self.switchon()
             self.online = True
             self.online_changed = True
             self.initialized = True
@@ -660,9 +672,6 @@ class Circle(object):
         retd['type'] = self.map_type(retd['type'])
         retd['relay_state'] = relay(retd['relay_state'])
         self.relay_state = retd['relay_state']
-        if self.attr['always_on'] != 'False' and self.relay_state == 'off':
-            return False
-        
         return retd
 
     def get_clock(self):
@@ -935,12 +944,10 @@ class Circle(object):
         #status = '00FA'
         
         
-    def _get_interval(self):
+    def _get_interval(self, cur_idx):
         self.interval=60
         self.usage=True
         self.production=False
-        info = self.get_info()
-        cur_idx = info['last_logaddr']
         if cur_idx < 1:
             return
         log = self.get_power_usage_history(cur_idx)

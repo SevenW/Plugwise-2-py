@@ -493,17 +493,17 @@ class PlugwiseStatusResponse(PlugwiseResponse):
 
     def __init__(self, seqnr = None):
         PlugwiseResponse.__init__(self, seqnr)
-        self.unknown = Int(0, length=2)
+        self.is_new_protocol_version = Int(0, length=2)
         self.network_is_online = Int(0, length=2)
         self.network_id = Int(0, length=16)
         self.network_id_short = Int(0, length=4)
-        self.unknown = Int(0, length=2)
+        self.unused = Int(0, length=2)
         self.params += [
-            self.unknown,
+            self.is_new_protocol_version,
             self.network_is_online,
             self.network_id,
             self.network_id_short,
-            self.unknown,
+            self.unused,
         ]
 
 class PlugwiseFeatureSetResponse(PlugwiseResponse):
@@ -635,7 +635,7 @@ class PlugwiseStatusRequest(PlugwiseRequest):
 
     def __init__(self):
         """message for that initializes the Stick"""
-        # init doesn't send MAC address
+        # status doesn't send MAC address
         PlugwiseRequest.__init__(self, '')
 
 class PlugwisePowerUsageRequest(PlugwiseRequest):
