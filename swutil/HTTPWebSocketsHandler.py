@@ -31,6 +31,7 @@ class HTTPWebSocketsHandler(SimpleHTTPRequestHandler):
     _opcode_close = 0x8
     _opcode_ping = 0x9
     _opcode_pong = 0xa
+    protocol_version = 'HTTP/1.1'
 
     #mutex = threading.Lock()
     
