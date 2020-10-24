@@ -15,7 +15,7 @@ class Mqtt_client(object):
         """
         info("MQTT client initializing for " + str(broker) +":"+ str(port))
         self.broker = str(broker)
-        self.port = str(port)
+        self.port = int(port) #str(port)
         self.qpub = qpub
         self.qsub = qsub
         self.rc = -1
@@ -76,7 +76,7 @@ class Mqtt_client(object):
                     try:
                         self.mqttc.publish(topic, msg, 0, retain)
                     except Exception as reason:
-                        error("MQTT connection error in publish: "+str(reason))
+                        error("MQTT connection error in publish: " + str(reason))
                 time.sleep(0.1)
             error("MQTT disconnected")
             

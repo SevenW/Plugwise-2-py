@@ -55,7 +55,7 @@ class BaseType(object):
         self.length = length
 
     def serialize(self):
-        return sc(self.value)
+        return self.value
 
     def unserialize(self, val):
         self.value = val
@@ -91,8 +91,8 @@ class StringVal(BaseType):
         self.length = length
                 
     def serialize(self):
-        fmt = "%%0%dd" % self.length
-        return sc(fmt % self.value)
+        fmt = b"%%0%dd" % self.length
+        return fmt % self.value
 
     def unserialize(self, val):
         try:
@@ -114,8 +114,8 @@ class SInt(BaseType):
         return val
 
     def serialize(self):
-        fmt = "%%0%dX" % self.length
-        return sc(fmt % int_to_uint(self.value, self.length))
+        fmt = b"%%0%dX" % self.length
+        return fmt % int_to_uint(self.value, self.length)
 
     def unserialize(self, val):
         self.value = self.negative(int(val,16), self.length)
@@ -126,8 +126,8 @@ class Int(BaseType):
         self.length = length
 
     def serialize(self):
-        fmt = "%%0%dX" % self.length
-        return sc(fmt % self.value)
+        fmt = b"%%0%dX" % self.length
+        return fmt % self.value
 
     def unserialize(self, val):
         self.value = int(val, 16)
@@ -233,7 +233,7 @@ class LogAddr(Int):
     LOGADDR_OFFSET = 278528
 
     def serialize(self):
-        return sc("%08X" % ((self.value * 32) + self.LOGADDR_OFFSET))
+        return b"%08X" % ((self.value * 32) + self.LOGADDR_OFFSET)
 
     def unserialize(self, val):
         Int.unserialize(self, val)
@@ -251,14 +251,14 @@ class PlugwiseMessage(object):
         on wire
         """
         args = b''.join(a.serialize() for a in self.args)
-        msg = self.ID+self.mac+sc(args)
+        msg = self.ID+self.mac+args
         checksum = self.calculate_checksum(msg)
         full_msg = self.PACKET_HEADER+msg+checksum+self.PACKET_FOOTER
-        logcomm("SEND %4d ---> %4s           %16s %s %4s <---" % (len(full_msg), self.ID, self.mac, sc(args), checksum))        
+        logcomm("SEND %4d ---> %4s           %16s %s %4s <---" % (len(full_msg), self.ID.decode(), self.mac.decode(), args.decode(), checksum.decode()))        
         return full_msg
 
     def calculate_checksum(self, s):
-        return sc("%04X" % crc_fun(s))
+        return b"%04X" % crc_fun(s)
 
 #class PlugwiseBaseResponse(PlugwiseMessage):
 class PlugwiseResponse(PlugwiseMessage):
@@ -268,7 +268,7 @@ class PlugwiseResponse(PlugwiseMessage):
         PlugwiseMessage.__init__(self)
         self.params = []
 
-        self.mac = None
+        PlugwiseStatusRequest = None
         self.function_code = None
         self.command_counter = None
         self.expected_command_counter = seqnr
@@ -308,15 +308,14 @@ class PlugwiseResponse(PlugwiseMessage):
         if len(protocol_error) > 0:
             raise ProtocolError(protocol_error)
             
-            
-        if self.function_code in ['0000', '0002', '0003', '0005']:
+        if self.function_code in [b'0000', b'0002', b'0003', b'0005']:
             response = response[12:-6]
         else:
             self.mac = response[12:28]
             response = response[28:-6]
         debug("DATA %4d %s" % (len(response), repr(response)))
         
-        if self.function_code in ['0006', '0061']:
+        if self.function_code in [b'0006', b'0061']:
             error("response.unserialize: detected %s expected %s" % (self.function_code, self.ID))
         
         if self.ID != 'FFFF' and self.function_code != self.ID:
@@ -328,20 +327,22 @@ class PlugwiseResponse(PlugwiseMessage):
         
         #log communication when no exceptions will be raised
         if self.mac is None:
-            logmac = '................'
+            logmac = b'................'
         else:
             logmac = self.mac
-        if self.function_code in ['0000', '0003', '0005']:
+        if self.function_code in [b'0000', b'0003', b'0005']:
             #HACK: retrieve info from Acq and AcqMac responses
             respstatus = response[:4]
-            logresp = ''
+            logresp = b''
             if raw_msg_len == 38:
                 logmac = response[4:]
         else:
-            respstatus = '....'
+            respstatus = b'....'
             logresp = response
-        logcomm("RECV %4d %s %4s %4s %4s %16s %s %4s %s" % (raw_msg_len, header, self.function_code, self.command_counter, respstatus, logmac, logresp, crc, footer))
-        #logcomm("RECV      "+repr(header)+" "+repr(self.function_code)+" "+repr(self.command_counter)+" <data> "+repr(crc)+" "+repr(footer))
+        logcomm("RECV %4d %s %4s %4s %4s %16s %s %4s %s" % 
+            (raw_msg_len, header, self.function_code.decode(), self.command_counter.decode(),
+            respstatus.decode(), logmac.decode(),
+            logresp.decode(), crc.decode(), footer))
         
         # FIXME: check function code match
         response = self._parse_params(response)
@@ -349,7 +350,7 @@ class PlugwiseResponse(PlugwiseMessage):
     def _parse_params(self, response):
         for p in self.params:
             myval = response[:len(p)]
-            #debug("PARS      "+repr(str(myval)))
+            debug("PARS      "+repr(str(myval)))
             p.unserialize(myval)
             debug("PARS      "+repr(str(myval)) + " EVAL "+repr(str(p.value)))
             response = response[len(myval):]
@@ -367,7 +368,7 @@ class PlugwiseAckResponse(PlugwiseResponse):
         self.status = Int(0, 4)
         self.params += [self.status]
 
-        #self.mac = None
+        self.mac = None
         self.command_counter = None
         
     def __len__(self):
@@ -627,7 +628,7 @@ class PlugwiseRequest(PlugwiseMessage):
     def __init__(self, mac):
         PlugwiseMessage.__init__(self)
         self.args = []
-        self.mac = sc(mac)
+        self.mac = mac
 
 class PlugwiseStatusRequest(PlugwiseRequest):
     """Get Stick Status"""
@@ -636,7 +637,7 @@ class PlugwiseStatusRequest(PlugwiseRequest):
     def __init__(self):
         """message for that initializes the Stick"""
         # status doesn't send MAC address
-        PlugwiseRequest.__init__(self, '')
+        PlugwiseRequest.__init__(self, b'')
 
 class PlugwisePowerUsageRequest(PlugwiseRequest):
     ID = b'0012'
@@ -792,10 +793,10 @@ class PlugwiseJoinNodeRequest(PlugwiseRequest):
         on wire
         """
         args = b''.join(a.serialize() for a in self.args)
-        msg = self.ID+sc(args)+self.mac
+        msg = self.ID+args+self.mac
         checksum = self.calculate_checksum(msg)
         full_msg = self.PACKET_HEADER+msg+checksum+self.PACKET_FOOTER
-        logcomm("SEND %4d ---> %4s        %2s %16s %4s <---" % (len(full_msg), self.ID, sc(args), self.mac, checksum))        
+        logcomm("SEND %4d ---> %4s        %2s %16s %4s <---" % (len(full_msg), self.ID.decode(), args.decode(), self.mac.decode(), checksum.decode()))        
         return full_msg
 
 class PlugwiseQueryCirclePlusRequest(PlugwiseRequest):
@@ -821,10 +822,10 @@ class PlugwiseConnectCirclePlusRequest(PlugwiseRequest):
         """
         #This command has args: byte: key, byte: networkinfo.index, ulong: networkkey = 0
         args = b'00000000000000000000'
-        msg = self.ID+sc(args)+self.mac
+        msg = self.ID+args+self.mac
         checksum = self.calculate_checksum(msg)
         full_msg = self.PACKET_HEADER+msg+checksum+self.PACKET_FOOTER
-        logcomm("SEND %4d ---> %4s           %s %16s %4s <---" % (len(full_msg), self.ID, sc(args), self.mac, checksum))        
+        logcomm("SEND %4d ---> %4s           %s %16s %4s <---" % (len(full_msg), self.ID.decode(), args.decode(), self.mac.decode(), checksum.decode()))        
         return full_msg
     
 class PlugwiseRemoveNodeRequest(PlugwiseRequest):

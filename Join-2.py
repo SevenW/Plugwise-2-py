@@ -55,8 +55,8 @@ import json
 #encoder.FLOAT_REPR = lambda o: format(o, '.2f')
 json.encoder.FLOAT_REPR = lambda f: ("%.2f" % f)
 
-def jsondefault(o):
-    return o.__dict__
+def jsondefault(object):
+    return object.decode('utf-8')
 
 #DEBUG_PROTOCOL = False
 log_comm(True)
@@ -153,13 +153,18 @@ class PWControl(object):
             #remove tabs which survive dialect='trimmed'
             for key in item:
                 if isinstance(item[key],str): item[key] = item[key].strip()
+            item['mac'] = item['mac'].upper().encode()
+            if item['production'].strip().lower() in ['true', '1', 't', 'y', 'yes', 'on']:
+                item['production'] = True
+            if 'revrse_pol' not in item:
+                item['reverse_pol'] = False
             self.bymac[item.get('mac')]=i
             self.byname[item.get('name')]=i
             #exception handling timeouts done by circle object for init
             self.circles.append(Circle(item['mac'], self.device, item))
             self.set_interval_production(self.circles[-1])
             i += 1
-            info("adding circle: %s" % (self.circles[-1].attr['name'],))
+            info("adding circle: %s" % (self.circles[-1].name,))
         
         #retrieve last log addresses from persistent storage
         with open(self.lastlogfname, 'a+') as f:
@@ -210,6 +215,7 @@ class PWControl(object):
             return ""
         try:
             status = c.get_status()
+            status["mac"] = status["mac"].decode('utf-8')
             status["monitor"] = (control['monitor'].lower() == 'yes')
             status["savelog"] = (control['savelog'].lower() == 'yes')
             #json.encoder.FLOAT_REPR = lambda f: ("%.2f" % f)
@@ -255,7 +261,7 @@ class PWControl(object):
             if not c.online:
                 continue
             try:
-                info("sync_time: circle %s time is %s" % (c.attr['name'], c.get_clock().isoformat()))
+                info("sync_time: circle %s time is %s" % (c.aname, c.get_clock().isoformat()))
                 if c.type()=='circle+':
                     #now = datetime.now()            
                     #local time not following DST (always non-DST)
@@ -274,10 +280,7 @@ class PWControl(object):
         if not c.online:
             return
         try:
-            prod = c.attr['production'].strip().lower() in ['true', '1', 't', 'y', 'yes', 'on']
-            interv = int(c.attr['loginterval'].strip())
-            if (c.interval != interv) or (c.production != prod):
-                c.set_log_interval(interv, prod)
+            c.set_log_interval(c.loginterval, c.production)
         except (ValueError, TimeoutException, SerialException) as reason:
             error("Error in set_interval_production: %s" % (reason,))
                             
@@ -337,7 +340,7 @@ class PWControl(object):
                 if c.schedule.name in self.schedulebyname:
                     sched = self.schedules[self.schedulebyname[c.schedule.name]]
                     if sched != c.schedule._watt:
-                        info("apply_schedule_changes: schedule changed. Update in circle %s - %s" % (c.attr['name'], c.schedule.name))
+                        info("apply_schedule_changes: schedule changed. Update in circle %s - %s" % (c.name, c.schedule.name))
                         #schedule changed so upload to this circle
                         c.define_schedule(c.schedule.name, sched, time.localtime().tm_isdst)
                         try:
@@ -368,6 +371,7 @@ class PWControl(object):
             #remove tabs which survive dialect='trimmed'
             for key in item:
                 if isinstance(item[key],str): item[key] = item[key].strip()
+            item['mac'] = item['mac'].upper().encode()
             newcontrols.append(item)
             self.controlsbymac[item['mac']]=i
             i += 1
@@ -580,7 +584,7 @@ class PWControl(object):
             os.makedirs(tmppath+yrfold+actdir)
         for mac, idx in self.controlsbymac.items():
             if self.controls[idx]['monitor'].lower() == 'yes':
-                fname = tmppath + yrfold + actdir + actpre + today + '-' + mac + actpost
+                fname = tmppath + yrfold + actdir + actpre + today + '-' + mac.decode('utf-8') + actpost
                 f = open(fname, 'a')
                 self.actfiles[mac]=f
 
@@ -599,16 +603,16 @@ class PWControl(object):
         # for mac, idx in self.controlsbymac.iteritems():
             # if self.controls[idx]['savelog'].lower() == 'yes':
                 # try:
-                    # if int(self.circles[self.bymac[self.controls[idx]['mac']]].attr['loginterval']) <60:
+                    # if int(self.circles[self.bymac[self.controls[idx]['mac']]].loginterval) <60:
                         # #daily logfiles - persistent iso tmp
-                        # #fname = tmppath + logdir + logpre + today + '-' + mac + logpost
-                        # fname = perpath + yrfolder + logdir + logpre + today + '-' + mac + logpost
+                        # #fname = tmppath + logdir + logpre + today + '-' + mac.decode('utf-8') + logpost
+                        # fname = perpath + yrfolder + logdir + logpre + today + '-' + mac.decode('utf-8') + logpost
                         # self.daylogfnames[mac]=fname
                 # except:
                     # #assume contineous logging only
                     # pass
                 # #contineous log files
-                # fname = perpath + yrfolder + logdir + logpre + mac + logpost
+                # fname = perpath + yrfolder + logdir + logpre + mac.decode('utf-8') + logpost
                 # self.logfnames[mac]=fname
                 # #f = open(fname, 'a')
                 
@@ -736,7 +740,7 @@ class PWControl(object):
             self.last_control_ts = os.stat(self.control_fn).st_mtime
     
     def ftopic(self, keyword, mac):
-        return str("plugwise2py/state/" + keyword +"/" + mac)
+        return str("plugwise2py/state/" + keyword +"/" + mac.decode('utf-8'))
 
     def publish_circle_state(self, mac):
         qpub.put((self.ftopic("circle", mac), str(self.get_status_json(mac)), True))
@@ -943,7 +947,7 @@ class PWControl(object):
             
             
             
-            # if c.attr['loginterval'] <60:
+            # if c.loginterval <60:
                 # dayfname = self.daylogfnames[mac]                
                 # f=open(dayfname,'a')
             # else:
@@ -980,7 +984,7 @@ class PWControl(object):
                                 f.close()
                             ndate = dt.date().isoformat()
                             # persistent iso tmp
-                            newfname= perpath + yrfold + logdir + logpre + ndate + '-' + mac + logpost
+                            newfname= perpath + yrfold + logdir + logpre + ndate + '-' + mac.decode('utf-8') + logpost
                             self.daylogfnames[mac]=newfname
                             f=open(newfname,'a')
                     else:
@@ -988,7 +992,7 @@ class PWControl(object):
                         if prev_dt.year != dt.year:
                             if fileopen:
                                 f.close()                                   
-                            newfname= perpath + yrfold + logdir + logpre + mac + logpost
+                            newfname= perpath + yrfold + logdir + logpre + mac.decode('utf-8') + logpost
                             self.logfnames[mac]=newfname
                             f=open(newfname,'a')
                     fileopen = True
@@ -1001,7 +1005,7 @@ class PWControl(object):
                 f.close()
                 
             if fileopen:
-                info("circle buffers: %s %s read from %d to %d" % (mac, c.attr['name'], first, last))
+                info("circle buffers: %s %s read from %d to %d" % (mac, c.name, first, last))
                 
             #store lastlog addresses to file
             with open(self.lastlogfname, 'w') as f:
@@ -1048,12 +1052,12 @@ class PWControl(object):
         #
         #TODO: Exception handling
         for c in self.circles:
-            if c.attr['name'] != 'circle+':
-                print('resetting '+c.attr['name'])
+            if c.name != 'circle+':
+                print('resetting '+c.name)
                 c.reset()
         for c in self.circles:
-            if c.attr['name'] == 'circle+':
-                print('resetting '+c.attr['name'])
+            if c.name == 'circle+':
+                print('resetting '+c.name)
                 c.reset()
         print('resetting stick')
         self.device.reset()
@@ -1290,7 +1294,7 @@ class PWControl(object):
             #update schedules after change in DST. Update one every ten seconds
             for c in self.circles:
                 if c.online and c.schedule != None and c.schedule.dst != time.localtime().tm_isdst:
-                    info("Circle '%s' schedule shift due to DST changed." % (c.attr['name'],))
+                    info("Circle '%s' schedule shift due to DST changed." % (c.name,))
                     idx=self.controlsbymac[c.mac]
                     self.apply_control_to_circle(self.controls[idx], c.mac, force=True)
                     break
