@@ -288,7 +288,7 @@ class Stick(SerialComChannel):
                     error("unexpected response [4]:"+str(reason))
 
     def enable_joining(self, enabled):
-        req = PlugwiseEnableJoiningRequest('', enabled)
+        req = PlugwiseEnableJoiningRequest(b'', enabled)
         _, seqnr  = self.send_msg(req.serialize())
         self.expect_response(PlugwiseAckMacResponse)
 

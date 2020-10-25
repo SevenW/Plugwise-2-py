@@ -192,6 +192,7 @@ class PWControl(object):
                     ts = int(parts[3])
                 logaddr =  int(logaddr)
                 debug("mac -%s- logaddr -%s- logaddr_idx -%s- logaddr_ts -%s- cum_energy -%s-" % (mac, logaddr, idx, ts, cum_energy))
+                mac = mac.encode()
                 try:
                     self.circles[self.bymac[mac]].last_log = logaddr
                     self.circles[self.bymac[mac]].last_log_idx = idx
@@ -829,7 +830,7 @@ class PWControl(object):
                 f.write("%5d, %8.2f\n" % (ts, usage,))
                 self.curfile.write("%s, %.2f\n" % (mac, usage))
                 #debug("MQTT put value in qpub")
-                msg = str('{"typ":"pwpower","ts":%d,"mac":"%s","power":%.2f}' % (ts, mac, usage))
+                msg = str('{"typ":"pwpower","ts":%d,"mac":"%s","power":%.2f}' % (ts, mac.decode('utf-8'), usage))
                 qpub.put((self.ftopic("power", mac), msg, True))
             except ValueError:
                 #print("%5d, " % (ts,))
@@ -1073,7 +1074,7 @@ class PWControl(object):
                     prev_dt = dt                
                     f.write("%s, %s, %s\n" % (ts_str, watt, watt_hour))
                     #debug("MQTT put value in qpub")
-                    msg = str('{"typ":"pwenergy","ts":%s,"mac":"%s","power":%s,"energy":%s,"cum_energy":%.4f,"interval":%d}' % (ts_str, mac, watt.strip(), watt_hour.strip(), c.cum_energy, c.interval))
+                    msg = str('{"typ":"pwenergy","ts":%s,"mac":"%s","power":%s,"energy":%s,"cum_energy":%.4f,"interval":%d}' % (ts_str, mac.decode('utf-8'), watt.strip(), watt_hour.strip(), c.cum_energy, c.interval))
                     qpub.put((self.ftopic("energy", mac), msg, True))
             if not f == None:
                 f.close()
@@ -1084,7 +1085,7 @@ class PWControl(object):
             #store lastlog addresses to file
             with open(self.lastlogfname, 'w') as f:
                 for c in self.circles:
-                    f.write("%s, %d, %d, %d, %.4f\n" % (c.mac, c.last_log, c.last_log_idx, c.last_log_ts, c.cum_energy))
+                    f.write("%s, %d, %d, %d, %.4f\n" % (c.mac.decode('utf-8'), c.last_log, c.last_log_idx, c.last_log_ts, c.cum_energy))
                             
         return fileopen #if fileopen actual writing to log files took place
         
