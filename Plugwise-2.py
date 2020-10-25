@@ -163,7 +163,7 @@ class PWControl(object):
             #remove tabs which survive dialect='trimmed'
             for key in item:
                 if isinstance(item[key],str): item[key] = item[key].strip()
-            item['mac'] = item['mac'].upper().encode()
+            item['mac'] = item['mac'].upper()
             if item['production'].strip().lower() in ['true', '1', 't', 'y', 'yes', 'on']:
                 item['production'] = True
             if 'reverse_pol' not in item:
@@ -192,7 +192,7 @@ class PWControl(object):
                     ts = int(parts[3])
                 logaddr =  int(logaddr)
                 debug("mac -%s- logaddr -%s- logaddr_idx -%s- logaddr_ts -%s- cum_energy -%s-" % (mac, logaddr, idx, ts, cum_energy))
-                mac = mac.encode()
+                mac = mac
                 try:
                     self.circles[self.bymac[mac]].last_log = logaddr
                     self.circles[self.bymac[mac]].last_log_idx = idx
@@ -229,7 +229,7 @@ class PWControl(object):
             return ""
         try:
             status = c.get_status()
-            status["mac"] = status["mac"].decode('utf-8')
+            status["mac"] = status["mac"]
             status["monitor"] = (control['monitor'].lower() == 'yes')
             status["savelog"] = (control['savelog'].lower() == 'yes')
             #json.encoder.FLOAT_REPR = lambda f: ("%.2f" % f)
@@ -385,7 +385,7 @@ class PWControl(object):
             #remove tabs which survive dialect='trimmed'
             for key in item:
                 if isinstance(item[key],str): item[key] = item[key].strip()
-            item['mac'] = item['mac'].upper().encode()
+            item['mac'] = item['mac'].upper()
             newcontrols.append(item)
             self.controlsbymac[item['mac']]=i
             i += 1
@@ -629,7 +629,7 @@ class PWControl(object):
             os.makedirs(tmppath+yrfold+actdir)
         for mac, idx in self.controlsbymac.items():
             if self.controls[idx]['monitor'].lower() == 'yes':
-                fname = tmppath + yrfold + actdir + actpre + today + '-' + mac.decode('utf-8') + actpost
+                fname = tmppath + yrfold + actdir + actpre + today + '-' + mac + actpost
                 f = open(fname, 'a')
                 self.actfiles[mac]=f
 
@@ -650,14 +650,14 @@ class PWControl(object):
                 # try:
                     # if int(self.circles[self.bymac[self.controls[idx]['mac']]].loginterval) <60:
                         # #daily logfiles - persistent iso tmp
-                        # #fname = tmppath + logdir + logpre + today + '-' + mac.decode('utf-8') + logpost
-                        # fname = perpath + yrfolder + logdir + logpre + today + '-' + mac.decode('utf-8') + logpost
+                        # #fname = tmppath + logdir + logpre + today + '-' + mac + logpost
+                        # fname = perpath + yrfolder + logdir + logpre + today + '-' + mac + logpost
                         # self.daylogfnames[mac]=fname
                 # except:
                     # #assume contineous logging only
                     # pass
                 # #contineous log files
-                # fname = perpath + yrfolder + logdir + logpre + mac.decode('utf-8') + logpost
+                # fname = perpath + yrfolder + logdir + logpre + mac + logpost
                 # self.logfnames[mac]=fname
                 # #f = open(fname, 'a')
                 
@@ -789,7 +789,7 @@ class PWControl(object):
             self.last_control_ts = os.stat(self.control_fn).st_mtime
     
     def ftopic(self, keyword, mac):
-        return ("plugwise2py/state/" + keyword + "/" + mac.decode('utf-8'))
+        return ("plugwise2py/state/" + keyword + "/" + mac)
 
     def publish_circle_state(self, mac):
         qpub.put((self.ftopic("circle", mac), str(self.get_status_json(mac)), True))
@@ -830,7 +830,7 @@ class PWControl(object):
                 f.write("%5d, %8.2f\n" % (ts, usage,))
                 self.curfile.write("%s, %.2f\n" % (mac, usage))
                 #debug("MQTT put value in qpub")
-                msg = str('{"typ":"pwpower","ts":%d,"mac":"%s","power":%.2f}' % (ts, mac.decode('utf-8'), usage))
+                msg = str('{"typ":"pwpower","ts":%d,"mac":"%s","power":%.2f}' % (ts, mac, usage))
                 qpub.put((self.ftopic("power", mac), msg, True))
             except ValueError:
                 #print("%5d, " % (ts,))
@@ -1059,7 +1059,7 @@ class PWControl(object):
                                 f.close()
                             ndate = dt.date().isoformat()
                             # persistent iso tmp
-                            newfname= perpath + yrfold + logdir + logpre + ndate + '-' + mac.decode('utf-8') + logpost
+                            newfname= perpath + yrfold + logdir + logpre + ndate + '-' + mac + logpost
                             self.daylogfnames[mac]=newfname
                             f=open(newfname,'a')
                     else:
@@ -1067,14 +1067,14 @@ class PWControl(object):
                         if prev_dt.year != dt.year:
                             if fileopen:
                                 f.close()                                   
-                            newfname= perpath + yrfold + logdir + logpre + mac.decode('utf-8') + logpost
+                            newfname= perpath + yrfold + logdir + logpre + mac + logpost
                             self.logfnames[mac]=newfname
                             f=open(newfname,'a')
                     fileopen = True
                     prev_dt = dt                
                     f.write("%s, %s, %s\n" % (ts_str, watt, watt_hour))
                     #debug("MQTT put value in qpub")
-                    msg = str('{"typ":"pwenergy","ts":%s,"mac":"%s","power":%s,"energy":%s,"cum_energy":%.4f,"interval":%d}' % (ts_str, mac.decode('utf-8'), watt.strip(), watt_hour.strip(), c.cum_energy, c.interval))
+                    msg = str('{"typ":"pwenergy","ts":%s,"mac":"%s","power":%s,"energy":%s,"cum_energy":%.4f,"interval":%d}' % (ts_str, mac, watt.strip(), watt_hour.strip(), c.cum_energy, c.interval))
                     qpub.put((self.ftopic("energy", mac), msg, True))
             if not f == None:
                 f.close()
@@ -1085,7 +1085,7 @@ class PWControl(object):
             #store lastlog addresses to file
             with open(self.lastlogfname, 'w') as f:
                 for c in self.circles:
-                    f.write("%s, %d, %d, %d, %.4f\n" % (c.mac.decode('utf-8'), c.last_log, c.last_log_idx, c.last_log_ts, c.cum_energy))
+                    f.write("%s, %d, %d, %d, %.4f\n" % (c.mac, c.last_log, c.last_log_idx, c.last_log_ts, c.cum_energy))
                             
         return fileopen #if fileopen actual writing to log files took place
         

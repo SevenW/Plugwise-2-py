@@ -34,20 +34,12 @@ LOG_COMMUNICATION = False
 pw_logger = None
 pw_comm_logger = None
 
-def _string_convert_py3(s):
-    if type(s) == type(b''):
-        return s
-
-    return bytes(s, 'latin-1')
-
-def _string_convert_py2(s):
-    # NOOP
-    return s
-
-if sys.version_info < (3, 0):
-    sc = _string_convert_py2
-else:
-    sc = _string_convert_py3
+def logf(msg):
+    if type(msg) == type("  "):
+        return msg
+    if type(msg) == type(b'  '):
+        return repr(msg.decode('utf-8'))[1:-1]
+    return repr(msg)[1:-1]
 
 def hexstr(s):
     return ' '.join(hex(ord(x)) for x in s)

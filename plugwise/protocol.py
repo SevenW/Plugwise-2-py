@@ -75,7 +75,7 @@ class CompositeType(BaseType):
             myval = val[:len(p)]
             #debug("PARS      "+repr(str(myval)))
             p.unserialize(myval)
-            debug("PARS      "+repr(str(myval)) + " EVAL "+repr(str(p.value)))
+            debug("PARS      "+ logf(myval) + " EVAL "+str(p.value))
             val = val[len(myval):]
         return val
         
@@ -304,7 +304,7 @@ class PlugwiseResponse(PlugwiseMessage):
                 header = '--->'
         if crc != self.calculate_checksum(response[4:-6]):
             protocol_error = "checksum error!"
-        debug("STRU      "+repr(header)+" "+repr(self.function_code)+" "+repr(self.command_counter)+" <data> "+repr(crc)+" "+repr(footer))
+        debug("STRU      "+header+" "+logf(self.function_code)+" "+logf(self.command_counter)+" <data> "+logf(crc)+" "+footer)
         if len(protocol_error) > 0:
             raise ProtocolError(protocol_error)
             
@@ -313,15 +313,15 @@ class PlugwiseResponse(PlugwiseMessage):
         else:
             self.mac = response[12:28]
             response = response[28:-6]
-        debug("DATA %4d %s" % (len(response), repr(response)))
+        debug("DATA %4d %s" % (len(response), logf(response)))
         
         if self.function_code in [b'0006', b'0061']:
-            error("response.unserialize: detected %s expected %s" % (self.function_code, self.ID))
+            error("response.unserialize: detected %s expected %s" % (logf(self.function_code), logf(self.ID)))
         
         if self.ID != 'FFFF' and self.function_code != self.ID:
-            raise UnexpectedResponse("expected response code %s, received code %s" % (self.ID, self.function_code))
+            raise UnexpectedResponse("expected response code %s, received code %s" % (logf(self.ID), logf(self.function_code)))
         if self.expected_command_counter != None and self.expected_command_counter != self.command_counter:
-            raise OutOfSequenceException("expected seqnr %s, received seqnr %s - this may be a duplicate message" % (self.expected_command_counter, self.command_counter))
+            raise OutOfSequenceException("expected seqnr %s, received seqnr %s - this may be a duplicate message" % (logf(self.expected_command_counter), logf(self.command_counter)))
         if raw_msg_len != len(self):
             raise UnexpectedResponse("response doesn't have expected length. expected %d bytes got %d" % (len(self), raw_msg_len))
         
@@ -350,9 +350,9 @@ class PlugwiseResponse(PlugwiseMessage):
     def _parse_params(self, response):
         for p in self.params:
             myval = response[:len(p)]
-            debug("PARS      "+repr(str(myval)))
+            debug("PARS      "+logf(myval))
             p.unserialize(myval)
-            debug("PARS      "+repr(str(myval)) + " EVAL "+repr(str(p.value)))
+            debug("PARS      "+logf(myval) + " EVAL "+str(p.value))
             response = response[len(myval):]
         return response
 
@@ -384,7 +384,7 @@ class PlugwiseAckResponse(PlugwiseResponse):
             elif self.expected_command_counter is None:
                 #In case of awaiting an Ack without knowing a seqnr, the most likely reason of
                 #an UnexpectedResponse is a duplicate (ghost) response from an older SEND request.
-                raise OutOfSequenceException("expected command ack from stick. received message with seqnr %s - this may be a duplicate message" % (self.command_counter,))
+                raise OutOfSequenceException("expected command ack from stick. received message with seqnr %s - this may be a duplicate message" % (logf(self.command_counter),))
             else:
                 raise
  
