@@ -261,7 +261,6 @@ class PlugwiseMessage(object):
     def calculate_checksum(self, s):
         return b"%04X" % crc_fun(s)
 
-#class PlugwiseBaseResponse(PlugwiseMessage):
 class PlugwiseResponse(PlugwiseMessage):
     ID = b'FFFF'
     
@@ -269,7 +268,7 @@ class PlugwiseResponse(PlugwiseMessage):
         PlugwiseMessage.__init__(self)
         self.params = []
 
-        PlugwiseStatusRequest = None
+        self.mac = None
         self.function_code = None
         self.command_counter = None
         self.expected_command_counter = seqnr

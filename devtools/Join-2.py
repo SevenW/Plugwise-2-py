@@ -280,6 +280,7 @@ class PWControl(object):
         if not c.online:
             return
         try:
+            #TODO: Check this. Previously log_interval was only set when difference between config file and circle state
             c.set_log_interval(c.loginterval, c.production)
         except (ValueError, TimeoutException, SerialException) as reason:
             error("Error in set_interval_production: %s" % (reason,))

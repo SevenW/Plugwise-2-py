@@ -192,7 +192,6 @@ class PWControl(object):
                     ts = int(parts[3])
                 logaddr =  int(logaddr)
                 debug("mac -%s- logaddr -%s- logaddr_idx -%s- logaddr_ts -%s- cum_energy -%s-" % (mac, logaddr, idx, ts, cum_energy))
-                mac = mac
                 try:
                     self.circles[self.bymac[mac]].last_log = logaddr
                     self.circles[self.bymac[mac]].last_log_idx = idx
@@ -229,7 +228,6 @@ class PWControl(object):
             return ""
         try:
             status = c.get_status()
-            status["mac"] = status["mac"]
             status["monitor"] = (control['monitor'].lower() == 'yes')
             status["savelog"] = (control['savelog'].lower() == 'yes')
             #json.encoder.FLOAT_REPR = lambda f: ("%.2f" % f)
@@ -294,6 +292,7 @@ class PWControl(object):
         if not c.online:
             return
         try:
+            #TODO: Check this. Previously log_interval was only set when difference between config file and circle state
             c.set_log_interval(c.loginterval, c.production)
         except (ValueError, TimeoutException, SerialException) as reason:
             error("Error in set_interval_production: %s" % (reason,))

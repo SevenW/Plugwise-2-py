@@ -112,8 +112,7 @@ class Stick(SerialComChannel):
         retry_timeout += 1
         while await_response:
             try:
-                msg += self.readline() #.decode("utf-8")
-                debug("REC0 %4d %s" % (len(msg), logf(msg)))
+                msg += self.readline()
             except SerialException as e:
                 print(e)
                 info("SerialException during readline - recovering. msg %s" % str(e))
@@ -187,7 +186,6 @@ class Stick(SerialComChannel):
                 #readlen = len(resp)
                 #debug("expecting to read "+str(readlen)+" bytes for msg. "+str(resp))
                 msg = self._recv_response(retry_timeout)
-                # print(msg)
                 resp.unserialize(msg)
                 if self.is_in_sequence(resp, seqnr) and (src_mac is None or src_mac == resp.mac):
                     return resp
@@ -426,6 +424,7 @@ class Circle(object):
             self._get_interval(cur_idx)
             if self.always_on != 'False' and self.relay_state == 'off':
                 self.switchon()
+            #TODO: Check this. Previously log_interval was only set when difference between config file and circle state
             self.set_log_interval(self.loginterval, self.production)
             self.online = True
             self.online_changed = True

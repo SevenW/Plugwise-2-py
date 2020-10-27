@@ -35,7 +35,7 @@ from plugwise.api import *
 
 log_comm(False)
 init_logger("plugwise_util.log")
-log_level(logging.DEBUG)
+log_level(logging.INFO)
 
 DEFAULT_SERIAL_PORT = "/dev/ttyUSB0"
 
