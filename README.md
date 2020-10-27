@@ -1,5 +1,9 @@
 Plugwise-2-py
 =============
+v2.0 runs on Python3. Python 2.7 is no longer supported, but can be found as v1.1
+-------------
+Please submit an issue when stability issues occur.
+
 
 #Key features:
 - Web-interface to switch, configure and edit schedules and stand-by killer
