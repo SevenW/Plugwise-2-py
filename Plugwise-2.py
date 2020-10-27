@@ -1271,8 +1271,10 @@ class PWControl(object):
             newnode = None
             try:
                 newnode = self.circles[self.bymac[newnodemac]]
+                if newnode != None:
+                    info("connect_unknown_node: joining node with MAC %s:" % (newnodemac,))
             except:
-                info("connect_unknown_node: not joining node with MAC %s: not in configuration" % (newnodemac,))        
+                info("connect_unknown_node: not joining node with MAC %s: not in configuration" % (newnodemac,))
             #accept or reject join based on occurence in pw-conf.json
             self.device.join_node(newnodemac, newnode != None)
         #clear the list

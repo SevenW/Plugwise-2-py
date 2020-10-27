@@ -380,6 +380,7 @@ class PlugwiseAckResponse(PlugwiseResponse):
             PlugwiseResponse.unserialize(self, response)
         except UnexpectedResponse as reason:
             if self.function_code != None and self.function_code in ['0006', '0061']:
+                debug("PlugwiseAckResponse.unserialize()  Unjoined node. Do we ever arrive here?")
                 raise
             elif self.expected_command_counter is None:
                 #In case of awaiting an Ack without knowing a seqnr, the most likely reason of
@@ -556,6 +557,7 @@ class PlugwiseAssociatedNodesResponse(PlugwiseResponse):
               
 class PlugwiseAdvertiseNodeResponse(PlugwiseResponse):
     ID = b'0006'
+    #this messages uses its own sequence counter so are received as "OutOfSequenceException"
 
     def __init__(self, seqnr = None):
         PlugwiseResponse.__init__(self, seqnr)

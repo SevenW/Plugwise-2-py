@@ -205,16 +205,16 @@ class Stick(SerialComChannel):
                         circle = self.circles[resp.mac.decode('utf-8')]
                         circle.pong = True
                     elif resp.function_code == b'0006':
-                        info("entering unknown advertise MAC")
+                        info("entering unknown advertise MAC [1]")
                         ackresp = PlugwiseAdvertiseNodeResponse()
                         ackresp.unserialize(msg)
-                        info("unknown advertise MAC %s" % logf(ackresp.mac))
-                        if ackresp.mac not in self.unjoined:
-                            self.unjoined.add(ackresp.mac)
+                        info("unknown advertise MAC [1] %s" % logf(ackresp.mac))
+                        if ackresp.mac.decode('utf-8') not in self.unjoined:
+                            self.unjoined.add(ackresp.mac.decode('utf-8'))
                     elif resp.function_code == b'0061':
                         ackresp = PlugwiseAckAssociationResponse()
                         ackresp.unserialize(msg)
-                        info("unknown MAC associating %s" % logf(ackresp.mac))
+                        info("unknown MAC associating [1] %s" % logf(ackresp.mac))
                     else:
                         logcomm("RERR %4d %s - <!> out of sequence: %s" % ( len(msg), logf(msg), str(reason)))
                         error("out of sequence error [2]:"+str(reason))
@@ -270,16 +270,16 @@ class Stick(SerialComChannel):
                         #     logcomm("RERR %4d %s - <!> unexpected response error while interpreting as Ack: %s" % ( len(msg), logf(msg), str(reason)))
                         #     error("unexpected response [2]:"+str(reason))
                     elif resp.function_code == b'0006':
-                        info("entering unknown advertise MAC ")
+                        info("entering unknown advertise MAC [2]")
                         ackresp = PlugwiseAdvertiseNodeResponse()
                         ackresp.unserialize(msg)
-                        info("[0006 with in-sequence?] unknown advertise MAC %s" % logf(ackresp.mac))
+                        info("[0006 with in-sequence?] unknown advertise MAC [2] %s" % logf(ackresp.mac))
                         if ackresp.mac not in self.unjoined:
                             self.unjoined.add(ackresp.mac)
                     elif resp.function_code == b'0061':
                         ackresp = PlugwiseAckAssociationResponse()
                         ackresp.unserialize(msg)
-                        info("[0061 with in-sequence?] unknown MAC associating %s" % logf(ackresp.mac))
+                        info("[0061 with in-sequence?] unknown MAC associating [2] %s" % logf(ackresp.mac))
                     else:
                         logcomm("RERR %4d %s - <!> unexpected response error while expecting Ack: %s" % ( len(msg), logf(msg), str(reason)))                    
                         error("unexpected response [4]:"+str(reason))
@@ -298,7 +298,7 @@ class Stick(SerialComChannel):
         self.expect_response(PlugwiseAckMacResponse)
 
     def join_node(self, newmac, permission):
-        req = PlugwiseJoinNodeRequest(newmac, permission)
+        req = PlugwiseJoinNodeRequest(newmac.encode('utf-8'), permission)
         _, seqnr  = self.send_msg(req.serialize())
         #No response other then normal ack
         #After this an unsollicted 0061 response from the circle may be received.
