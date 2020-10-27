@@ -63,7 +63,7 @@ if 'log_level' in cfg:
         log_level(logging.ERROR)
     else:
         log_level(logging.INFO)
-        
+
 info('Number of arguments: %d' % (len(sys.argv),))
 info('Argument List: %s' % (sys.argv,))
 
@@ -112,9 +112,9 @@ if len(sys.argv) > 2:
 else:
     secure = False
 if len(sys.argv) > 3:
-    credentials = str(sys.argv[3])
+    credentials = str(sys.argv[3]).encode()
 else:
-    credentials = ""
+    credentials = b""
     
 def broadcaster():
     while True:
@@ -333,7 +333,7 @@ class PW2PYwebHandler(HTTPWebSocketsHandler):
         
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     """Handle requests in a separate thread."""
- 
+
 def main():
     try:
         server = ThreadedHTTPServer(('', port), PW2PYwebHandler)

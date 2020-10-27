@@ -1,6 +1,4 @@
-#!/bin/env python
-
-# Copyright (C) 2012,2013,2014,2015,2016,2017 Seven Watt <info@sevenwatt.com>
+# Copyright (C) 2012,2013,2014,2015,2016,2017,2018,2019,2020 Seven Watt <info@sevenwatt.com>
 # <http://www.sevenwatt.com>
 #
 # This file is part of Plugwise-2-py.
@@ -115,6 +113,7 @@ class Stick(SerialComChannel):
         while await_response:
             try:
                 msg += self.readline() #.decode("utf-8")
+                debug("REC0 %4d %s" % (len(msg), logf(msg)))
             except SerialException as e:
                 print(e)
                 info("SerialException during readline - recovering. msg %s" % str(e))
@@ -169,6 +168,7 @@ class Stick(SerialComChannel):
                 #perform logcomm after interpetation of response
                 #logcomm("RECV %4d %s" % ( len(msg), logf(msg)))
                 await_response = False
+        debug("RECV %4d %s" % (len(msg), logf(msg)))
         return msg
         
     def is_in_sequence(self, resp, seqnr):
@@ -189,8 +189,9 @@ class Stick(SerialComChannel):
                 msg = self._recv_response(retry_timeout)
                 # print(msg)
                 resp.unserialize(msg)
-                if self.is_in_sequence(resp, seqnr) and src_mac is None or src_mac == resp.mac:
+                if self.is_in_sequence(resp, seqnr) and (src_mac is None or src_mac == resp.mac):
                     return resp
+                error("expect_response: received response but did not return as expected %s %s %s %s" % (str(seqnr), str(src_mac), str(resp.mac), self.is_in_sequence(resp, seqnr)))
             except ProtocolError as reason:
                 #retry to receive the response
                 logcomm("RERR %4d %s - <!> protocol error: %s" % ( len(msg), logf(msg), str(reason)))
@@ -198,25 +199,44 @@ class Stick(SerialComChannel):
             except OutOfSequenceException as reason:
                 #retry to receive the response
                 #test ping response any offline circle
-                if resp.function_code == '000E':
-                    info("expect_response: out of sequence ping response")
-                    pingresp = PlugwisePingResponse()
-                    pingresp.unserialize(msg)
-                    circle = self.circles[resp.mac]
-                    circle.pong = True
-                else:
-                    logcomm("RERR %4d %s - <!> out of sequence: %s" % ( len(msg), logf(msg), str(reason)))
-                    error("protocol error [2]:"+str(reason))
+                try:
+                    if resp.function_code == b'000E':
+                        info("expect_response: out of sequence PING response")
+                        pingresp = PlugwisePingResponse()
+                        pingresp.unserialize(msg)
+                        circle = self.circles[resp.mac.decode('utf-8')]
+                        circle.pong = True
+                    elif resp.function_code == b'0006':
+                        info("entering unknown advertise MAC")
+                        ackresp = PlugwiseAdvertiseNodeResponse()
+                        ackresp.unserialize(msg)
+                        info("unknown advertise MAC %s" % logf(ackresp.mac))
+                        if ackresp.mac not in self.unjoined:
+                            self.unjoined.add(ackresp.mac)
+                    elif resp.function_code == b'0061':
+                        ackresp = PlugwiseAckAssociationResponse()
+                        ackresp.unserialize(msg)
+                        info("unknown MAC associating %s" % logf(ackresp.mac))
+                    else:
+                        logcomm("RERR %4d %s - <!> out of sequence: %s" % ( len(msg), logf(msg), str(reason)))
+                        error("out of sequence error [2]:"+str(reason))
+                #Reinterpretation of response should never raise ProtocolError or UnexpectedResponse
+                #OutOfSequenceException is suppressed bu not passing seqnr in Response constructor
+                except (OutOfSequenceException, ProtocolError, UnexpectedResponse) as reason:
+                    #retry to receive the response
+                    logcomm("RERR %4d %s - <!> error while reinterpreting out of sequence response: %s" % ( len(msg), logf(msg), str(reason)))
+                    error("error while reinterpreting out of sequence response:"+str(reason))
             except UnexpectedResponse as reason:
                 #response could be an error status message
                 #suppress error logging when expecting a response to ping in case circle is offline
+                #TODO: This logging suppresion is probably no longer required
                 if str(reason) != "'expected response code 000E, received code 0000'":
                     error("unexpected response [1]:"+str(reason))
                 else:
                     debug("unexpected response [1]:"+str(reason))
-                if not issubclass(resp.__class__, PlugwiseAckResponse):
-                    #Could be an Ack or AckMac or AcqAssociation error code response when same seqnr
-                    try:
+                try:
+                    if resp.function_code == b'0000' and not issubclass(resp.__class__, PlugwiseAckResponse):
+                        #Could be an Ack or AckMac or AcqAssociation error code response when same seqnr
                         if (len(msg) == 22 and msg[0:1] == b'\x05') or (len(msg) == 23 and msg[0:1] == b'\x83'):
                             ackresp = PlugwiseAckResponse()
                             ackresp.unserialize(msg)
@@ -231,62 +251,48 @@ class Stick(SerialComChannel):
                             #it does not appear to be a proper Ack message
                             #just retry to read next message
                             logcomm("RERR %4d %s - <!> unexpected response error: %s" % ( len(msg), logf(msg), str(reason)))
-                            pass
-                    except ProtocolError as reason:
-                        #retry to receive the response
-                        logcomm("RERR %4d %s - <!> protocol error while interpreting as Ack: %s" % ( len(msg), logf(msg), str(reason)))
-                        error("protocol error [3]:"+str(reason))
-                    except OutOfSequenceException as reason:
-                        #retry to receive the response
-                        #test ping response any offline circle
-                        if resp.function_code == '000E':
-                            info("expect_response while interpreting as Ack: out of sequence ping response")
-                            pingresp = PlugwisePingResponse()
-                            pingresp.unserialize(msg)
-                            circle = self.circles[resp.mac]
-                            circle.pong = True
-                        else:
-                            logcomm("RERR %4d %s - <!> out of sequence while interpreting as Ack: %s" % ( len(msg), logf(msg), str(reason)))
-                            error("protocol error [4]:"+str(reason))
-                    except UnexpectedResponse as reason:
-                        #response could be an error status message
-                        logcomm("RERR %4d %s - <!> unexpected response error while interpreting as Ack: %s" % ( len(msg), logf(msg), str(reason)))
-                        error("unexpected response [2]:"+str(reason))
-                error("TEST: %s" % (logf(resp.function_code),))
-                if resp.function_code in ['0006', '0061']:
-                    #Could be an unsolicited AdvertiseNode or AcqAssociation response
-                    try:
-                        if resp.function_code == "0006":
-                            info("entering unknown advertise MAC ")
-                            ackresp = PlugwiseAdvertiseNodeResponse()
-                            ackresp.unserialize(msg)
-                            info("unknown advertise MAC %s" % logf(ackresp.mac))
-                            if ackresp.mac not in self.unjoined:
-                                self.unjoined.add(ackresp.mac)
-                        elif resp.function_code == "0061":
-                            ackresp = PlugwiseAckAssociationResponse()
-                            ackresp.unserialize(msg)
-                            info("unknown MAC associating %s" % logf(ackresp.mac))
-                        else:
-                            #it does not appear to be a proper Ack message
-                            #just retry to read next message
-                            logcomm("RERR %4d %s - <!> unexpected response error: %s" % ( len(msg), logf(msg), str(reason)))
-                            pass
-                    except ProtocolError as reason:
-                        #retry to receive the response
-                        logcomm("RERR %4d %s - <!> protocol error while interpreting as Advertise: %s" % ( len(msg), logf(msg), str(reason)))
-                        error("protocol error [5]:"+str(reason))
-                    except OutOfSequenceException as reason:
-                        #retry to receive the response
-                        logcomm("RERR %4d %s - <!> out of sequence while interpreting as Advertise: %s" % ( len(msg), logf(msg), str(reason)))
-                        error("protocol error [6]:"+str(reason))
-                    except UnexpectedResponse as reason:
-                        #response could be an error status message
-                        logcomm("RERR %4d %s - <!> unexpected response error while interpreting as Advertise: %s" % ( len(msg), logf(msg), str(reason)))
-                        error("unexpected response [3]:"+str(reason))
-                else:
-                    logcomm("RERR %4d %s - <!> unexpected response error while expecting Ack: %s" % ( len(msg), logf(msg), str(reason)))                    
-                    error("unexpected response [4]:"+str(reason))
+                        # except ProtocolError as reason:
+                        #     #retry to receive the response
+                        #     logcomm("RERR %4d %s - <!> protocol error while interpreting as Ack: %s" % ( len(msg), logf(msg), str(reason)))
+                        #     error("protocol error [3]:"+str(reason))
+                        # except OutOfSequenceException as reason:
+                        #     #retry to receive the response
+                        #     #test ping response any offline circle
+                        #     if resp.function_code == '000E':
+                        #         info("expect_response while interpreting as Ack: out of sequence ping response")
+                        #         pingresp = PlugwisePingResponse()
+                        #         pingresp.unserialize(msg)
+                        #         circle = self.circles[resp.mac]
+                        #         circle.pong = True
+                        #     else:
+                        #         logcomm("RERR %4d %s - <!> out of sequence while interpreting as Ack: %s" % ( len(msg), logf(msg), str(reason)))
+                        #         error("protocol error [4]:"+str(reason))
+                        # except UnexpectedResponse as reason:
+                        #     #response could be an error status message
+                        #     logcomm("RERR %4d %s - <!> unexpected response error while interpreting as Ack: %s" % ( len(msg), logf(msg), str(reason)))
+                        #     error("unexpected response [2]:"+str(reason))
+                    elif resp.function_code == b'0006':
+                        info("entering unknown advertise MAC ")
+                        ackresp = PlugwiseAdvertiseNodeResponse()
+                        ackresp.unserialize(msg)
+                        info("[0006 with in-sequence?] unknown advertise MAC %s" % logf(ackresp.mac))
+                        if ackresp.mac not in self.unjoined:
+                            self.unjoined.add(ackresp.mac)
+                    elif resp.function_code == b'0061':
+                        ackresp = PlugwiseAckAssociationResponse()
+                        ackresp.unserialize(msg)
+                        info("[0061 with in-sequence?] unknown MAC associating %s" % logf(ackresp.mac))
+                    else:
+                        logcomm("RERR %4d %s - <!> unexpected response error while expecting Ack: %s" % ( len(msg), logf(msg), str(reason)))                    
+                        error("unexpected response [4]:"+str(reason))
+                #Reinterpretation of response should never raise ProtocolError or UnexpectedResponse
+                #OutOfSequenceException is suppressed bu not passing seqnr in Response constructor
+                except (OutOfSequenceException, ProtocolError, UnexpectedResponse) as reason:
+                    #retry to receive the response
+                    logcomm("RERR %4d %s - <!> error while reinterpreting unexpected response: %s" % ( len(msg), logf(msg), str(reason)))
+                    error("error while reinterpreting  unexpected response:"+str(reason))
+            error("TEST: %s - going to retry receive msg" % (logf(resp.function_code),))
+
 
     def enable_joining(self, enabled):
         req = PlugwiseEnableJoiningRequest(b'', enabled)
@@ -515,14 +521,14 @@ class Circle(object):
             # if not isinstance(resp, response_class):
                 # #error status returned
                 # if resp.status.value == 0xE1:
-                    # debug("Received an error status '%04X' from circle '%s' - Network slow or circle offline - Retry receive ..." % (logf(resp.status.value), self.name))
+                    # debug("Received an error status '%04X' from circle '%s' - Network slow or circle offline - Retry receive ..." % (resp.status.value, self.name))
                     # retry_timeout = 1 #allow 1+1 seconds for timeout after an E1.
                 # else:
-                    # error("Received an error status '%04X' from circle '%s' with correct seqnr - Retry receive ..." % (logf(resp.status.value), self.name))
+                    # error("Received an error status '%04X' from circle '%s' with correct seqnr - Retry receive ..." % (resp.status.value, self.name))
             if not isinstance(resp, response_class):
                 #error status returned
                 if resp.status.value == 0xE1:
-                    debug("Received an error status '%04X' from circle '%s' - Network slow or circle offline - Retry receive ..." % (logf(resp.status.value), self.name))
+                    debug("Received an error status '%04X' from circle '%s' - Network slow or circle offline - Retry receive ..." % (resp.status.value, self.name))
                     #retry_timeout = 1 #allow 1+1 seconds for timeout after an E1.
                     if self.online:
                         info("OFFLINE Circle '%s'." % (self.name,))
@@ -531,7 +537,7 @@ class Circle(object):
                     self.pong = False
                     raise TimeoutException("Timeout while waiting for response from circle '%s'" % (self.name,))
                 else:
-                    error("Received an error status '%04X' from circle '%s' with correct seqnr - Retry receive ..." % (logf(resp.status.value), self.name))
+                    error("Received an error status '%04X' from circle '%s' with correct seqnr - Retry receive ..." % (resp.status.value, self.name))
             else:
                 ts_now = calendar.timegm(datetime.datetime.utcnow().utctimetuple())
                 if not self.online:
@@ -719,13 +725,13 @@ class Circle(object):
         resp = self._expect_response(PlugwiseAckMacResponse, seqnr)
         if on == True:
             if resp.status.value != 0xD8:
-                error("Wrong switch status reply when  switching on. expected '00D8', received '%04X'" % (logf(resp.status.value),))
+                error("Wrong switch status reply when  switching on. expected '00D8', received '%04X'" % (resp.status.value,))
             self.switch_state = 'on'
             self.relay_state = 'on'
             #self.schedule_state = 'off'
         else:
             if resp.status.value != 0xDE:
-                error("Wrong switch status reply when switching off. expected '00DE', received '%04X'" % (logf(resp.status.value),))
+                error("Wrong switch status reply when switching off. expected '00DE', received '%04X'" % (resp.status.value,))
             self.switch_state = 'off'
             self.relay_state = 'off'
             #self.schedule_state = 'off'
@@ -925,13 +931,13 @@ class Circle(object):
         resp = self._expect_response(PlugwiseAckMacResponse, seqnr)
         if on == True:
             if resp.status.value != 0xE4:
-                error("Wrong schedule status reply when setting schedule on. expected '00E4', received '%04X'" % (logf(resp.status.value),))
+                error("Wrong schedule status reply when setting schedule on. expected '00E4', received '%04X'" % (resp.status.value,))
             self.schedule_state = 'on'
             #update self.relay_state
             self.get_info()
         else:
             if resp.status.value != 0xE5:
-                error("Wrong schedule status reply when setting schedule off. expected '00E5', received '%04X'" % (logf(resp.status.value),))
+                error("Wrong schedule status reply when setting schedule off. expected '00E5', received '%04X'" % (resp.status.value,))
             self.schedule_state = 'off'  
         return 
 

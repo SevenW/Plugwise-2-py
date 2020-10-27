@@ -1,4 +1,4 @@
-# Copyright (C) 2012,2013,2014,2015 Seven Watt <info@sevenwatt.com>
+# Copyright (C) 2012,2013,2014,2015,2016,2017,2018,2019,2020 Seven Watt <info@sevenwatt.com>
 # <http://www.sevenwatt.com>
 #
 # This file is part of Plugwise-2-py.
@@ -38,7 +38,7 @@ def logf(msg):
     if type(msg) == type("  "):
         return msg
     if type(msg) == type(b'  '):
-        return repr(msg.decode('utf-8'))[1:-1]
+        return repr(msg.decode('utf-8', 'backslashreplace'))[1:-1]
     return repr(msg)[1:-1]
 
 def hexstr(s):

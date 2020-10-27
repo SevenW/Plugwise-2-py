@@ -1,6 +1,6 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
-# Copyright (C) 2012,2013,2014,2015 Seven Watt <info@sevenwatt.com>
+# Copyright (C) 2012,2013,2014,2015,2016,2017,2018,2019,2020 Seven Watt <info@sevenwatt.com>
 # <http://www.sevenwatt.com>
 #
 # This file is part of Plugwise-2-py.
@@ -153,7 +153,7 @@ class PWControl(object):
             #remove tabs which survive dialect='trimmed'
             for key in item:
                 if isinstance(item[key],str): item[key] = item[key].strip()
-            item['mac'] = item['mac'].upper().encode()
+            item['mac'] = item['mac'].upper()
             if item['production'].strip().lower() in ['true', '1', 't', 'y', 'yes', 'on']:
                 item['production'] = True
             if 'revrse_pol' not in item:
@@ -215,7 +215,7 @@ class PWControl(object):
             return ""
         try:
             status = c.get_status()
-            status["mac"] = status["mac"].decode('utf-8')
+            status["mac"] = status["mac"]
             status["monitor"] = (control['monitor'].lower() == 'yes')
             status["savelog"] = (control['savelog'].lower() == 'yes')
             #json.encoder.FLOAT_REPR = lambda f: ("%.2f" % f)
@@ -371,7 +371,7 @@ class PWControl(object):
             #remove tabs which survive dialect='trimmed'
             for key in item:
                 if isinstance(item[key],str): item[key] = item[key].strip()
-            item['mac'] = item['mac'].upper().encode()
+            item['mac'] = item['mac'].upper()
             newcontrols.append(item)
             self.controlsbymac[item['mac']]=i
             i += 1
@@ -584,7 +584,7 @@ class PWControl(object):
             os.makedirs(tmppath+yrfold+actdir)
         for mac, idx in self.controlsbymac.items():
             if self.controls[idx]['monitor'].lower() == 'yes':
-                fname = tmppath + yrfold + actdir + actpre + today + '-' + mac.decode('utf-8') + actpost
+                fname = tmppath + yrfold + actdir + actpre + today + '-' + mac + actpost
                 f = open(fname, 'a')
                 self.actfiles[mac]=f
 
@@ -605,14 +605,14 @@ class PWControl(object):
                 # try:
                     # if int(self.circles[self.bymac[self.controls[idx]['mac']]].loginterval) <60:
                         # #daily logfiles - persistent iso tmp
-                        # #fname = tmppath + logdir + logpre + today + '-' + mac.decode('utf-8') + logpost
-                        # fname = perpath + yrfolder + logdir + logpre + today + '-' + mac.decode('utf-8') + logpost
+                        # #fname = tmppath + logdir + logpre + today + '-' + mac + logpost
+                        # fname = perpath + yrfolder + logdir + logpre + today + '-' + mac + logpost
                         # self.daylogfnames[mac]=fname
                 # except:
                     # #assume contineous logging only
                     # pass
                 # #contineous log files
-                # fname = perpath + yrfolder + logdir + logpre + mac.decode('utf-8') + logpost
+                # fname = perpath + yrfolder + logdir + logpre + mac + logpost
                 # self.logfnames[mac]=fname
                 # #f = open(fname, 'a')
                 
@@ -740,7 +740,7 @@ class PWControl(object):
             self.last_control_ts = os.stat(self.control_fn).st_mtime
     
     def ftopic(self, keyword, mac):
-        return str("plugwise2py/state/" + keyword +"/" + mac.decode('utf-8'))
+        return str("plugwise2py/state/" + keyword +"/" + mac)
 
     def publish_circle_state(self, mac):
         qpub.put((self.ftopic("circle", mac), str(self.get_status_json(mac)), True))
@@ -984,7 +984,7 @@ class PWControl(object):
                                 f.close()
                             ndate = dt.date().isoformat()
                             # persistent iso tmp
-                            newfname= perpath + yrfold + logdir + logpre + ndate + '-' + mac.decode('utf-8') + logpost
+                            newfname= perpath + yrfold + logdir + logpre + ndate + '-' + mac + logpost
                             self.daylogfnames[mac]=newfname
                             f=open(newfname,'a')
                     else:
@@ -992,7 +992,7 @@ class PWControl(object):
                         if prev_dt.year != dt.year:
                             if fileopen:
                                 f.close()                                   
-                            newfname= perpath + yrfold + logdir + logpre + mac.decode('utf-8') + logpost
+                            newfname= perpath + yrfold + logdir + logpre + mac + logpost
                             self.logfnames[mac]=newfname
                             f=open(newfname,'a')
                     fileopen = True

@@ -1,4 +1,4 @@
-# Copyright (C) 2012,2013,2014,2015,2016,2017 Seven Watt <info@sevenwatt.com>
+# Copyright (C) 2012,2013,2014,2015,2016,2017,2018,2019,2020 Seven Watt <info@sevenwatt.com>
 # <http://www.sevenwatt.com>
 #
 # This file is part of Plugwise-2-py.
@@ -83,7 +83,8 @@ class CompositeType(BaseType):
         return sum(len(x) for x in self.contents)
 
 class String(BaseType):
-    pass
+    def serialize(self):
+        return self.value.encode()
     
 class StringVal(BaseType):
     def __init__(self, value, length=2):
@@ -318,10 +319,10 @@ class PlugwiseResponse(PlugwiseMessage):
         if self.function_code in [b'0006', b'0061']:
             error("response.unserialize: detected %s expected %s" % (logf(self.function_code), logf(self.ID)))
         
-        if self.ID != 'FFFF' and self.function_code != self.ID:
-            raise UnexpectedResponse("expected response code %s, received code %s" % (logf(self.ID), logf(self.function_code)))
         if self.expected_command_counter != None and self.expected_command_counter != self.command_counter:
             raise OutOfSequenceException("expected seqnr %s, received seqnr %s - this may be a duplicate message" % (logf(self.expected_command_counter), logf(self.command_counter)))
+        if self.ID != 'FFFF' and self.function_code != self.ID:
+            raise UnexpectedResponse("expected response code %s, received code %s" % (logf(self.ID), logf(self.function_code)))
         if raw_msg_len != len(self):
             raise UnexpectedResponse("response doesn't have expected length. expected %d bytes got %d" % (len(self), raw_msg_len))
         
@@ -399,7 +400,7 @@ class PlugwiseAckMacResponse(PlugwiseAckResponse):
         
     def unserialize(self, response):
         PlugwiseAckResponse.unserialize(self, response)
-        self.mac = str(self.acqmac.value)
+        self.mac = self.acqmac.value
 
 class PlugwiseCalibrationResponse(PlugwiseResponse):
     ID = b'0027'

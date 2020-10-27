@@ -1,7 +1,7 @@
 '''
 The MIT License (MIT)
 
-Copyright (C) 2014, 2015 Seven Watt <info@sevenwatt.com>
+Copyright (C) 2012,2013,2014,2015,2016,2017,2018,2019,2020 Seven Watt <info@sevenwatt.com>
 <http://www.sevenwatt.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
@@ -15,7 +15,6 @@ from http.server import SimpleHTTPRequestHandler
 import struct
 from base64 import b64encode
 from hashlib import sha1
-from mimetools import Message
 from io import StringIO
 import errno, socket #for socket exceptions
 import threading
@@ -31,7 +30,7 @@ class HTTPWebSocketsHandler(SimpleHTTPRequestHandler):
     _opcode_close = 0x8
     _opcode_ping = 0x9
     _opcode_pong = 0xa
-    protocol_version = 'HTTP/1.1'
+    # protocol_version = 'HTTP/1.1' where is this used?
 
     #mutex = threading.Lock()
     
@@ -81,10 +80,8 @@ class HTTPWebSocketsHandler(SimpleHTTPRequestHandler):
             SimpleHTTPRequestHandler.handle(self)
         except (socket.error,) as err:
             self.log_message("handle(): Exception: in SimpleHTTPRequestHandler.handle(): %s" % str(err.args))
-            print(("handle(): Exception: in SimpleHTTPRequestHandler.handle(): %s" % str(err.args)))
         except (TypeError,) as err:
             self.log_message("handle(): Exception: in SimpleHTTPRequestHandler.handle(): %s" % str(err))
-            print(("handle(): Exception: in SimpleHTTPRequestHandler.handle(): %s" % str(err)))
         self.log_message("handle done on worker thread %d" % threading.current_thread().ident)
 
     def checkAuthentication(self):
@@ -135,20 +132,22 @@ class HTTPWebSocketsHandler(SimpleHTTPRequestHandler):
         #self.rfile.read(n) is blocking.
         #it returns however immediately when the socket is closed.
         try:
-            self.opcode = ord(self.rfile.read(1)) & 0x0F
+            self.opcode = ord(self.rfile.read(1)) & 0x0F           
             length = ord(self.rfile.read(1)) & 0x7F
+            self.log_message("_read_next_message: opcode: %02X length: %d" % (self.opcode, length))
             if length == 126:
                 length = struct.unpack(">H", self.rfile.read(2))[0]
             elif length == 127:
                 length = struct.unpack(">Q", self.rfile.read(8))[0]
-            masks = [ord(byte) for byte in self.rfile.read(4)]
+            masks = [byte for byte in self.rfile.read(4)]
             decoded = ""
-            for char in self.rfile.read(length):
-                decoded += chr(ord(char) ^ masks[len(decoded) % 4])
+            for byte in self.rfile.read(length):
+                decoded += chr(byte ^ masks[len(decoded) % 4])
             self._on_message(decoded)
         except (struct.error, TypeError) as e:
             #catch exceptions from ord() and struct.unpack()
             if self.connected:
+                self.log_message("_read_next_message exception %s" % (str(e.args)))
                 raise WebSocketError("Websocket read aborted while listening")
             else:
                 #the socket was closed while waiting for input
@@ -156,20 +155,21 @@ class HTTPWebSocketsHandler(SimpleHTTPRequestHandler):
                 pass
         
     def _send_message(self, opcode, message):
+        #self.log_message("_send_message: opcode: %02X msg: %s" % (opcode, message))
         try:
             #use of self.wfile.write gives socket exception after socket is closed. Avoid.
-            self.request.send(chr(0x80 + opcode))
+            self.request.send((0x80 + opcode).to_bytes(1, 'big'))
             length = len(message)
             if length <= 125:
-                self.request.send(chr(length))
+                self.request.send(length.to_bytes(1, 'big'))
             elif length >= 126 and length <= 65535:
-                self.request.send(chr(126))
+                self.request.send((126).to_bytes(1, 'big'))
                 self.request.send(struct.pack(">H", length))
             else:
-                self.request.send(chr(127))
+                self.request.send((127).to_bytes(1, 'big'))
                 self.request.send(struct.pack(">Q", length))
             if length > 0:
-                self.request.send(message)
+                self.request.send(message.encode('utf-8'))
         except socket.error as e:
             #websocket content error, time-out or disconnect.
             self.log_message("SND: Close connection: Socket Error %s" % str(e.args))
@@ -180,15 +180,16 @@ class HTTPWebSocketsHandler(SimpleHTTPRequestHandler):
             self._ws_close()
 
     def _handshake(self):
+        # self.log_message("_handshake()")
         headers=self.headers
         if self.headers.get("Upgrade", None) and self.headers.get("Upgrade", None).lower().strip() != "websocket":
             return
         key = headers['Sec-WebSocket-Key']
-        digest = b64encode(sha1(key + self._ws_GUID).hexdigest().decode('hex'))
+        digest = b64encode(sha1((key + self._ws_GUID).encode()).digest()).decode()
         self.send_response(101, 'Switching Protocols')
         self.send_header('Upgrade', 'websocket')
         self.send_header('Connection', 'Upgrade')
-        self.send_header('Sec-WebSocket-Accept', str(digest))
+        self.send_header('Sec-WebSocket-Accept', digest)
         self.end_headers()
         self.connected = True
         #self.close_connection = 0
@@ -220,7 +221,7 @@ class HTTPWebSocketsHandler(SimpleHTTPRequestHandler):
         #self.log_message("LOCK: RLSD _was_close obj: %s thd %s" % (str(self) , threading.current_thread().ident)) 
             
     def _on_message(self, message):
-        #self.log_message("_on_message: opcode: %02X msg: %s" % (self.opcode, message))
+        # self.log_message("_on_message: opcode: %02X msg: %s" % (self.opcode, message))
         
         # close
         if self.opcode == self._opcode_close:
