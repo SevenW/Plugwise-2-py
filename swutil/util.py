@@ -1,4 +1,4 @@
-# Copyright (C) 2012,2013,2014,2015 Seven Watt <info@sevenwatt.com>
+# Copyright (C) 2012,2013,2014,2015,2016,2017,2018,2019,2020 Seven Watt <info@sevenwatt.com>
 # <http://www.sevenwatt.com>
 #
 # This file is part of Plugwise-2-py.
@@ -34,20 +34,12 @@ LOG_COMMUNICATION = False
 pw_logger = None
 pw_comm_logger = None
 
-def _string_convert_py3(s):
-    if type(s) == type(b''):
-        return s
-
-    return bytes(s, 'latin-1')
-
-def _string_convert_py2(s):
-    # NOOP
-    return s
-
-if sys.version_info < (3, 0):
-    sc = _string_convert_py2
-else:
-    sc = _string_convert_py3
+def logf(msg):
+    if type(msg) == type("  "):
+        return msg
+    if type(msg) == type(b'  '):
+        return repr(msg.decode('utf-8', 'backslashreplace'))[1:-1]
+    return repr(msg)[1:-1]
 
 def hexstr(s):
     return ' '.join(hex(ord(x)) for x in s)

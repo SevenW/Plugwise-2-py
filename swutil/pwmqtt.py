@@ -1,8 +1,29 @@
-#!/usr/bin/env python
+# Copyright (C) 2012,2013,2014,2015,2016,2017,2018,2019,2020 Seven Watt <info@sevenwatt.com>
+# <http://www.sevenwatt.com>
+#
+# This file is part of Plugwise-2-py.
+#
+# Plugwise-2-py is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Plugwise-2-py is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Plugwise-2-py.  If not, see <http://www.gnu.org/licenses/>. 
+#
+# The program is a major modification and extension to:
+#   python-plugwise - written in 2011 by Sven Petai <hadara@bsd.ee> 
+# which itself is inspired by Plugwise-on-Linux (POL):
+#   POL v0.2 - written in 2009 by Maarten Damen <http://www.maartendamen.com>
 
 import paho.mqtt.client as mosquitto
 from .util import *
-import Queue
+import queue
 import time
 import os
 
@@ -15,7 +36,7 @@ class Mqtt_client(object):
         """
         info("MQTT client initializing for " + str(broker) +":"+ str(port))
         self.broker = str(broker)
-        self.port = str(port)
+        self.port = int(port) #str(port)
         self.qpub = qpub
         self.qsub = qsub
         self.rc = -1
@@ -76,7 +97,7 @@ class Mqtt_client(object):
                     try:
                         self.mqttc.publish(topic, msg, 0, retain)
                     except Exception as reason:
-                        error("MQTT connection error in publish: "+str(reason))
+                        error("MQTT connection error in publish: " + str(reason))
                 time.sleep(0.1)
             error("MQTT disconnected")
             
@@ -84,7 +105,7 @@ class Mqtt_client(object):
             time.sleep(5)
             self.rc = self._connect()
             if self.connected():
-                for subscr in self.subscriptions.items():
+                for subscr in list(self.subscriptions.items()):
                     self.mqttc.subscribe(subscr[0], subscr[1])
                     info("MQTT subscribed to %s with qos %d" % (subscr[0], subscr[1]))
                 
@@ -102,8 +123,8 @@ class Mqtt_client(object):
             info("MQTT unsubscribed from %s" % topic)
 
     def on_message(self, client, userdata, message):
-        #debug("MQTT " + message.topic+" "+str(message.payload))
-        self.qsub.put((message.topic, str(message.payload)))
+        debug("MQTT " + message.topic+" "+str(message.payload))
+        self.qsub.put((message.topic, message.payload.decode('utf-8')))
 
     def on_connect(self, client, userdata, flags, rc):
         if rc == 0:

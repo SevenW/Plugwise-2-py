@@ -1,6 +1,4 @@
-#!/bin/env python
-
-# Copyright (C) 2012,2013,2014,2015,2016,2017 Seven Watt <info@sevenwatt.com>
+# Copyright (C) 2012,2013,2014,2015,2016,2017,2018,2019,2020 Seven Watt <info@sevenwatt.com>
 # <http://www.sevenwatt.com>
 #
 # This file is part of Plugwise-2-py.
@@ -64,6 +62,7 @@ class Stick(SerialComChannel):
         if self.connected:
             self.init()
 
+
     def init(self):
         """send init message to the stick"""
         self.status()
@@ -76,7 +75,7 @@ class Stick(SerialComChannel):
             time.sleep(1)
             self.reopen()
         except Exception as e:
-            print e      
+            print(e)      
             error("Error: %s" % str(e),) 
         #if init raises an exception, let the application handle it.
         if self.connected:
@@ -84,11 +83,11 @@ class Stick(SerialComChannel):
 
     def send_msg(self, cmd):
         #log communication done in serialize function of message object. Could be too early!
-        debug("SEND %4d %s" % (len(cmd), repr(cmd)))
+        debug("SEND %4d %s" % (len(cmd), logf(cmd)))
         try:
             self.write(cmd)
         except SerialException as e:
-            print e
+            print(e)
             info("SerialException during write - recovering. msg %s" % str(e))
             self.reconnect()
         while 1:
@@ -109,19 +108,19 @@ class Stick(SerialComChannel):
 
     def _recv_response(self, retry_timeout=5):
         await_response = True
-        msg = ""
+        msg = b""
         retry_timeout += 1
         while await_response:
             try:
                 msg += self.readline()
             except SerialException as e:
-                print e
+                print(e)
                 info("SerialException during readline - recovering. msg %s" % str(e))
                 self.reconnect()
             # if msg == b"":
                 # logcomm("TOUT      '' - <!> Timeout on serial port" )        
                 # raise TimeoutException("Timeout while waiting for response from device")                
-            # #debug("read:"+repr(msg)+" with length "+str(len(msg)))
+            # #debug("read:"+logf(msg)+" with length "+str(len(msg)))
             
             # if (msg != b""):
                 # if (msg[-1] != '\n'):
@@ -134,11 +133,11 @@ class Stick(SerialComChannel):
                     # logcomm("last byte : %04X" % (ord(msg[-1]),))
                     # pass
             # logcomm("counter: %2d" % (retry_timeout,))
-            if (msg == b"") or (msg[-1] != '\n'):
+            if (msg == b"") or ((msg[-1] != ord('\n')) and (msg[-1] != 131)): #131 = 0x83
                 retry_timeout -= 1
                 if retry_timeout <= 0:
                     if (msg != b""):
-                        logcomm("TOUT %4d %s - <!> Timeout on serial port" % ( len(msg), repr(msg)))  
+                        logcomm("TOUT %4d %s - <!> Timeout on serial port" % ( len(msg), logf(msg)))  
                     else:
                         logcomm("TOUT      '' - <!> Timeout on serial port" )        
                     raise TimeoutException("Timeout while waiting for response from device")
@@ -152,22 +151,23 @@ class Stick(SerialComChannel):
                 ### 2011 firmware seems to sometimes send extra \x83 byte before some of the
                 ### response messages but there might a all kinds of chatter going on so just 
                 # look for our packet header. Due to protocol errors it might be in the middle of a response
-                logcomm("DSTR %4d %s" % ( len(msg[:header_start]), repr(msg[:header_start])))
+                logcomm("DSTR %4d %s" % ( len(msg[:header_start]), repr(msg[:header_start].decode('utf-8'))))
                 msg = msg[header_start:]
                 
-            if msg.find('#') >= 0:
-                logcomm("DTRC %4d %s" % ( len(msg), repr(msg)))
-                msg = ""
+            if msg.find(b'#') >= 0:
+                logcomm("DTRC %4d %s" % ( len(msg), logf(msg)))
+                msg = b""
             elif len(msg)<22:
                 # Ignore. It is too short to interpet as a message.
                 # It may be part of Stick debug messages.
-                logcomm("DSHR %4d %s" % ( len(msg), repr(msg)))
-                msg = ""
+                logcomm("DSHR %4d %s" % ( len(msg), logf(msg)))
+                msg = b""
             else:
                 #message can be interpreted as response
                 #perform logcomm after interpetation of response
-                #logcomm("RECV %4d %s" % ( len(msg), repr(msg)))
+                #logcomm("RECV %4d %s" % ( len(msg), logf(msg)))
                 await_response = False
+        debug("RECV %4d %s" % (len(msg), logf(msg)))
         return msg
         
     def is_in_sequence(self, resp, seqnr):
@@ -187,34 +187,54 @@ class Stick(SerialComChannel):
                 #debug("expecting to read "+str(readlen)+" bytes for msg. "+str(resp))
                 msg = self._recv_response(retry_timeout)
                 resp.unserialize(msg)
-                if self.is_in_sequence(resp, seqnr) and src_mac is None or src_mac == resp.mac:
+                if self.is_in_sequence(resp, seqnr) and (src_mac is None or src_mac == resp.mac):
                     return resp
+                error("expect_response: received response but did not return as expected %s %s %s %s" % (str(seqnr), str(src_mac), str(resp.mac), self.is_in_sequence(resp, seqnr)))
             except ProtocolError as reason:
                 #retry to receive the response
-                logcomm("RERR %4d %s - <!> protocol error: %s" % ( len(msg), repr(msg), str(reason)))
+                logcomm("RERR %4d %s - <!> protocol error: %s" % ( len(msg), logf(msg), str(reason)))
                 error("protocol error [1]:"+str(reason))
             except OutOfSequenceException as reason:
                 #retry to receive the response
                 #test ping response any offline circle
-                if resp.function_code == '000E':
-                    info("expect_response: out of sequence ping response")
-                    pingresp = PlugwisePingResponse()
-                    pingresp.unserialize(msg)
-                    circle = self.circles[resp.mac]
-                    circle.pong = True
-                else:
-                    logcomm("RERR %4d %s - <!> out of sequence: %s" % ( len(msg), repr(msg), str(reason)))
-                    error("protocol error [2]:"+str(reason))
+                try:
+                    if resp.function_code == b'000E':
+                        info("expect_response: out of sequence PING response")
+                        pingresp = PlugwisePingResponse()
+                        pingresp.unserialize(msg)
+                        circle = self.circles[resp.mac.decode('utf-8')]
+                        circle.pong = True
+                    elif resp.function_code == b'0006':
+                        info("entering unknown advertise MAC")
+                        ackresp = PlugwiseAdvertiseNodeResponse()
+                        ackresp.unserialize(msg)
+                        info("unknown advertise MAC %s" % logf(ackresp.mac))
+                        if ackresp.mac not in self.unjoined:
+                            self.unjoined.add(ackresp.mac)
+                    elif resp.function_code == b'0061':
+                        ackresp = PlugwiseAckAssociationResponse()
+                        ackresp.unserialize(msg)
+                        info("unknown MAC associating %s" % logf(ackresp.mac))
+                    else:
+                        logcomm("RERR %4d %s - <!> out of sequence: %s" % ( len(msg), logf(msg), str(reason)))
+                        error("out of sequence error [2]:"+str(reason))
+                #Reinterpretation of response should never raise ProtocolError or UnexpectedResponse
+                #OutOfSequenceException is suppressed bu not passing seqnr in Response constructor
+                except (OutOfSequenceException, ProtocolError, UnexpectedResponse) as reason:
+                    #retry to receive the response
+                    logcomm("RERR %4d %s - <!> error while reinterpreting out of sequence response: %s" % ( len(msg), logf(msg), str(reason)))
+                    error("error while reinterpreting out of sequence response:"+str(reason))
             except UnexpectedResponse as reason:
                 #response could be an error status message
                 #suppress error logging when expecting a response to ping in case circle is offline
+                #TODO: This logging suppresion is probably no longer required
                 if str(reason) != "'expected response code 000E, received code 0000'":
                     error("unexpected response [1]:"+str(reason))
                 else:
                     debug("unexpected response [1]:"+str(reason))
-                if not issubclass(resp.__class__, PlugwiseAckResponse):
-                    #Could be an Ack or AckMac or AcqAssociation error code response when same seqnr
-                    try:
+                try:
+                    if resp.function_code == b'0000' and not issubclass(resp.__class__, PlugwiseAckResponse):
+                        #Could be an Ack or AckMac or AcqAssociation error code response when same seqnr
                         if (len(msg) == 22 and msg[0:1] == b'\x05') or (len(msg) == 23 and msg[0:1] == b'\x83'):
                             ackresp = PlugwiseAckResponse()
                             ackresp.unserialize(msg)
@@ -228,66 +248,52 @@ class Stick(SerialComChannel):
                         else:
                             #it does not appear to be a proper Ack message
                             #just retry to read next message
-                            logcomm("RERR %4d %s - <!> unexpected response error: %s" % ( len(msg), repr(msg), str(reason)))
-                            pass
-                    except ProtocolError as reason:
-                        #retry to receive the response
-                        logcomm("RERR %4d %s - <!> protocol error while interpreting as Ack: %s" % ( len(msg), repr(msg), str(reason)))
-                        error("protocol error [3]:"+str(reason))
-                    except OutOfSequenceException as reason:
-                        #retry to receive the response
-                        #test ping response any offline circle
-                        if resp.function_code == '000E':
-                            info("expect_response while interpreting as Ack: out of sequence ping response")
-                            pingresp = PlugwisePingResponse()
-                            pingresp.unserialize(msg)
-                            circle = self.circles[resp.mac]
-                            circle.pong = True
-                        else:
-                            logcomm("RERR %4d %s - <!> out of sequence while interpreting as Ack: %s" % ( len(msg), repr(msg), str(reason)))
-                            error("protocol error [4]:"+str(reason))
-                    except UnexpectedResponse as reason:
-                        #response could be an error status message
-                        logcomm("RERR %4d %s - <!> unexpected response error while interpreting as Ack: %s" % ( len(msg), repr(msg), str(reason)))
-                        error("unexpected response [2]:"+str(reason))
-                error("TEST: %s" % (resp.function_code,))
-                if resp.function_code in ['0006', '0061']:
-                    #Could be an unsolicited AdvertiseNode or AcqAssociation response
-                    try:
-                        if resp.function_code == "0006":
-                            info("entering unknown advertise MAC ")
-                            ackresp = PlugwiseAdvertiseNodeResponse()
-                            ackresp.unserialize(msg)
-                            info("unknown advertise MAC %s" % str(ackresp.mac))
-                            if ackresp.mac not in self.unjoined:
-                                self.unjoined.add(ackresp.mac)
-                        elif resp.function_code == "0061":
-                            ackresp = PlugwiseAckAssociationResponse()
-                            ackresp.unserialize(msg)
-                            info("unknown MAC associating %s" % str(ackresp.mac))
-                        else:
-                            #it does not appear to be a proper Ack message
-                            #just retry to read next message
-                            logcomm("RERR %4d %s - <!> unexpected response error: %s" % ( len(msg), repr(msg), str(reason)))
-                            pass
-                    except ProtocolError as reason:
-                        #retry to receive the response
-                        logcomm("RERR %4d %s - <!> protocol error while interpreting as Advertise: %s" % ( len(msg), repr(msg), str(reason)))
-                        error("protocol error [5]:"+str(reason))
-                    except OutOfSequenceException as reason:
-                        #retry to receive the response
-                        logcomm("RERR %4d %s - <!> out of sequence while interpreting as Advertise: %s" % ( len(msg), repr(msg), str(reason)))
-                        error("protocol error [6]:"+str(reason))
-                    except UnexpectedResponse as reason:
-                        #response could be an error status message
-                        logcomm("RERR %4d %s - <!> unexpected response error while interpreting as Advertise: %s" % ( len(msg), repr(msg), str(reason)))
-                        error("unexpected response [3]:"+str(reason))
-                else:
-                    logcomm("RERR %4d %s - <!> unexpected response error while expecting Ack: %s" % ( len(msg), repr(msg), str(reason)))                    
-                    error("unexpected response [4]:"+str(reason))
+                            logcomm("RERR %4d %s - <!> unexpected response error: %s" % ( len(msg), logf(msg), str(reason)))
+                        # except ProtocolError as reason:
+                        #     #retry to receive the response
+                        #     logcomm("RERR %4d %s - <!> protocol error while interpreting as Ack: %s" % ( len(msg), logf(msg), str(reason)))
+                        #     error("protocol error [3]:"+str(reason))
+                        # except OutOfSequenceException as reason:
+                        #     #retry to receive the response
+                        #     #test ping response any offline circle
+                        #     if resp.function_code == '000E':
+                        #         info("expect_response while interpreting as Ack: out of sequence ping response")
+                        #         pingresp = PlugwisePingResponse()
+                        #         pingresp.unserialize(msg)
+                        #         circle = self.circles[resp.mac]
+                        #         circle.pong = True
+                        #     else:
+                        #         logcomm("RERR %4d %s - <!> out of sequence while interpreting as Ack: %s" % ( len(msg), logf(msg), str(reason)))
+                        #         error("protocol error [4]:"+str(reason))
+                        # except UnexpectedResponse as reason:
+                        #     #response could be an error status message
+                        #     logcomm("RERR %4d %s - <!> unexpected response error while interpreting as Ack: %s" % ( len(msg), logf(msg), str(reason)))
+                        #     error("unexpected response [2]:"+str(reason))
+                    elif resp.function_code == b'0006':
+                        info("entering unknown advertise MAC ")
+                        ackresp = PlugwiseAdvertiseNodeResponse()
+                        ackresp.unserialize(msg)
+                        info("[0006 with in-sequence?] unknown advertise MAC %s" % logf(ackresp.mac))
+                        if ackresp.mac not in self.unjoined:
+                            self.unjoined.add(ackresp.mac)
+                    elif resp.function_code == b'0061':
+                        ackresp = PlugwiseAckAssociationResponse()
+                        ackresp.unserialize(msg)
+                        info("[0061 with in-sequence?] unknown MAC associating %s" % logf(ackresp.mac))
+                    else:
+                        logcomm("RERR %4d %s - <!> unexpected response error while expecting Ack: %s" % ( len(msg), logf(msg), str(reason)))                    
+                        error("unexpected response [4]:"+str(reason))
+                #Reinterpretation of response should never raise ProtocolError or UnexpectedResponse
+                #OutOfSequenceException is suppressed bu not passing seqnr in Response constructor
+                except (OutOfSequenceException, ProtocolError, UnexpectedResponse) as reason:
+                    #retry to receive the response
+                    logcomm("RERR %4d %s - <!> error while reinterpreting unexpected response: %s" % ( len(msg), logf(msg), str(reason)))
+                    error("error while reinterpreting  unexpected response:"+str(reason))
+            error("TEST: %s - going to retry receive msg" % (logf(resp.function_code),))
+
 
     def enable_joining(self, enabled):
-        req = PlugwiseEnableJoiningRequest('', enabled)
+        req = PlugwiseEnableJoiningRequest(b'', enabled)
         _, seqnr  = self.send_msg(req.serialize())
         self.expect_response(PlugwiseAckMacResponse)
 
@@ -299,7 +305,7 @@ class Stick(SerialComChannel):
 
     def reset(self):
         type = 0
-        req = PlugwiseResetRequest(self.mac, self._devtype, 20)
+        req = PlugwiseResetRequest(self._mac(), self._devtype, 20)
         _, seqnr  = self.send_msg(req.serialize())
         resp = self.expect_response(PlugwiseAckMacResponse)
         return resp.status.value
@@ -312,7 +318,7 @@ class Stick(SerialComChannel):
         #The short repsonse is likely not properly handled (exception?)
         resp = self.expect_response(PlugwiseStatusResponse)
         debug(str(resp))
-        self.mac = resp.mac
+        self.mac = resp.mac.decode('utf-8')
         if resp.network_id !=  0:
             self.pan = resp.network_id.serialize()
             self.short_pan = resp.network_id_short.serialize()
@@ -346,21 +352,25 @@ class Circle(object):
         """
         will raise ValueError if mac doesn't look valid
         """
-        mac = str(mac).upper()
+        self.mac = mac.upper()
         if self._validate_mac(mac) == False:
             raise ValueError("MAC address is in unexpected format: "+str(mac))
-
-        self.mac = sc(mac)
-        #debug("self.mac %s" % (type(self.mac),))
-        #debug("mac %s" % (type(mac),))
 
         self._comchan = comchan
         comchan.circles[self.mac] = self
         
-        self.attr = attr
+        #self.attr = attr
         #Fix 'swedish' characters
-        self.attr['name'] = self.attr['name'].encode('utf-8')
-        
+        # self.name = self.name.encode('utf-8')
+        # self.name = self.name.encode('utf-8').decode()
+        self.name = attr['name'].strip()
+        self.always_on = attr['always_on'].strip()
+        self.location = attr['location'].strip()
+        self.reverse_pol = attr['reverse_pol']
+        self.production = attr['production']
+        self.loginterval = int(attr['loginterval'].strip())
+
+
         self._devtype = None
 
         self.gain_a = None
@@ -380,7 +390,7 @@ class Circle(object):
         self.switch_state = '?'
         self.schedule_state = '?'
         self.requid = 'unset'
-        if self.attr['always_on'] != 'False':
+        if self.always_on != 'False':
             #self.relay_state = 'on'
             self.schedule_state = 'off'
         self.last_seen = calendar.timegm(datetime.datetime.utcnow().utctimetuple())
@@ -398,6 +408,10 @@ class Circle(object):
         
         self.reinit()
         
+    def _mac(self):
+        #convert mac to bytes for communication protocol
+        return self.mac.encode()
+
     def set_online(self):
         self.online = True
         self.online_changed = True
@@ -408,8 +422,10 @@ class Circle(object):
             info = self.get_info()
             cur_idx = info['last_logaddr']
             self._get_interval(cur_idx)
-            if self.attr['always_on'] != 'False' and self.relay_state == 'off':
+            if self.always_on != 'False' and self.relay_state == 'off':
                 self.switchon()
+            #TODO: Check this. Previously log_interval was only set when difference between config file and circle state
+            self.set_log_interval(self.loginterval, self.production)
             self.online = True
             self.online_changed = True
             self.initialized = True
@@ -417,7 +433,7 @@ class Circle(object):
             self.online = False
             self.online_changed = True
             self.initialized = False
-            error("OFFLINE Circle '%s' during initialization Error: %s" % (self.attr['name'], str(reason)))       
+            error("OFFLINE Circle '%s' during initialization Error: %s" % (self.name, str(reason)))       
         self.pong = False
 
     def get_status(self):
@@ -427,12 +443,12 @@ class Circle(object):
             retd["type"] = "unknown"
         else:
             retd["type"] = self._devtype
-        retd["name"] = self.attr["name"]
-        retd["location"] = self.attr["location"]
+        retd["name"] = self.name
+        retd["location"] = self.location
         retd["online"] = self.online
         retd["lastseen"] = self.last_seen
-        retd["readonly"] = (self.attr['always_on'] != 'False')
-        retd["reverse_pol"] = (self.attr['reverse_pol'] != 'False')
+        retd["readonly"] = (self.always_on != 'False')
+        retd["reverse_pol"] = (self.reverse_pol != 'False')
         retd["switch"] = self.relay_state
         retd["switchreq"] = self.switch_state
         retd["schedule"] = self.schedule_state
@@ -492,39 +508,39 @@ class Circle(object):
         while retry_count >= 0:
             retry_count -= 1
             try:
-                resp = self._comchan.expect_response(response_class, self.mac, seqnr, retry_timeout)
+                resp = self._comchan.expect_response(response_class, self._mac(), seqnr, retry_timeout)
             except (TimeoutException, SerialException) as reason:
                 if self.online:
-                    info("OFFLINE Circle '%s'." % (self.attr['name'],))
+                    info("OFFLINE Circle '%s'." % (self.name,))
                 self.online = False
                 self.online_changed = True
                 self.pong = False
-                raise TimeoutException("Timeout while waiting for response from circle '%s'" % (self.attr['name'],))
+                raise TimeoutException("Timeout while waiting for response from circle '%s'" % (self.name,))
             
             # if not isinstance(resp, response_class):
                 # #error status returned
                 # if resp.status.value == 0xE1:
-                    # debug("Received an error status '%04X' from circle '%s' - Network slow or circle offline - Retry receive ..." % (resp.status.value, self.attr['name']))
+                    # debug("Received an error status '%04X' from circle '%s' - Network slow or circle offline - Retry receive ..." % (resp.status.value, self.name))
                     # retry_timeout = 1 #allow 1+1 seconds for timeout after an E1.
                 # else:
-                    # error("Received an error status '%04X' from circle '%s' with correct seqnr - Retry receive ..." % (resp.status.value, self.attr['name']))
+                    # error("Received an error status '%04X' from circle '%s' with correct seqnr - Retry receive ..." % (resp.status.value, self.name))
             if not isinstance(resp, response_class):
                 #error status returned
                 if resp.status.value == 0xE1:
-                    debug("Received an error status '%04X' from circle '%s' - Network slow or circle offline - Retry receive ..." % (resp.status.value, self.attr['name']))
+                    debug("Received an error status '%04X' from circle '%s' - Network slow or circle offline - Retry receive ..." % (resp.status.value, self.name))
                     #retry_timeout = 1 #allow 1+1 seconds for timeout after an E1.
                     if self.online:
-                        info("OFFLINE Circle '%s'." % (self.attr['name'],))
+                        info("OFFLINE Circle '%s'." % (self.name,))
                     self.online = False
                     self.online_changed = True
                     self.pong = False
-                    raise TimeoutException("Timeout while waiting for response from circle '%s'" % (self.attr['name'],))
+                    raise TimeoutException("Timeout while waiting for response from circle '%s'" % (self.name,))
                 else:
-                    error("Received an error status '%04X' from circle '%s' with correct seqnr - Retry receive ..." % (resp.status.value, self.attr['name']))
+                    error("Received an error status '%04X' from circle '%s' with correct seqnr - Retry receive ..." % (resp.status.value, self.name))
             else:
                 ts_now = calendar.timegm(datetime.datetime.utcnow().utctimetuple())
                 if not self.online:
-                    info("ONLINE  Circle '%s' after %d seconds." % (self.attr['name'], ts_now - self.last_seen))
+                    info("ONLINE  Circle '%s' after %d seconds." % (self.name, ts_now - self.last_seen))
                     self.online = True
                     self.online_changed = True
                     self.pong = False
@@ -533,12 +549,12 @@ class Circle(object):
                 return resp
         #we only end here when multiple ack or ackmac messages are generated before the real response
         if self.online:
-            info("OFFLINE Circle '%s'." % (self.attr['name'],))
+            info("OFFLINE Circle '%s'." % (self.name,))
         self.online = False
         self.online_changed = True
         self.pong = False
         #TODO: Replace timeout exception by more specific exception
-        raise TimeoutException("Received multiple error messages from circle '%s'" % (self.attr['name'],))
+        raise TimeoutException("Received multiple error messages from circle '%s'" % (self.name,))
         
     def map_type(self, devtype):
         types = dict({0: 'stick', 1: 'circle+', 2: 'circle'})
@@ -600,7 +616,7 @@ class Circle(object):
     def calibrate(self):
         """fetch calibration info from the device
         """
-        msg = PlugwiseCalibrationRequest(self.mac).serialize()
+        msg = PlugwiseCalibrationRequest(self._mac()).serialize()
         _, seqnr  = self._comchan.send_msg(msg)
         calibration_response = self._expect_response(PlugwiseCalibrationResponse, seqnr)
         retl = []
@@ -616,12 +632,12 @@ class Circle(object):
         """return pulse counters for 1s interval, 8s interval and for the current hour,
         both usage and production as a tuple
         """
-        msg = PlugwisePowerUsageRequest(self.mac).serialize()
+        msg = PlugwisePowerUsageRequest(self._mac()).serialize()
         _, seqnr  = self._comchan.send_msg(msg)
         debug("counters mac %s, seqnr %s" % (self.mac, seqnr))
         resp = self._expect_response(PlugwisePowerUsageResponse, seqnr)
         p1s, p8s, p1h, pp1h = resp.pulse_1s.value, resp.pulse_8s.value, resp.pulse_hour.value, resp.pulse_prod_hour.value
-        if self.attr['production'] == 'False':
+        if self.production == 'False':
             pp1h = 0
         return (p1s, p8s, p1h, pp1h)
 
@@ -638,7 +654,7 @@ class Circle(object):
         debug("POWER:          1h: %.3f" % (kw_1h,))
         kw_p_1h = 1000*self.pulses_to_kWs(self.pulse_correction(pulse_prod_1h, 3600))/3600.0
         debug("POWER:     prod 1h: %.3f" % (kw_p_1h,))
-        if 'reverse_pol' in self.attr and self.attr['reverse_pol'] == 'True':
+        if self.reverse_pol == 'True':
             kw_1s = -kw_1s 
             kw_8s = -kw_8s
             kw_1h = -kw_1h
@@ -663,7 +679,7 @@ class Circle(object):
             states = dict({0: 'off', 1: 'on'})
             return states[state]
 
-        msg = PlugwiseInfoRequest(self.mac).serialize()
+        msg = PlugwiseInfoRequest(self._mac()).serialize()
         _, seqnr  = self._comchan.send_msg(msg)
         resp = self._expect_response(PlugwiseInfoResponse, seqnr)
         retd = response_to_dict(resp)
@@ -677,18 +693,18 @@ class Circle(object):
     def get_clock(self):
         """fetch current time from the device
         """
-        msg = PlugwiseClockInfoRequest(self.mac).serialize()
+        msg = PlugwiseClockInfoRequest(self._mac()).serialize()
         _, seqnr  = self._comchan.send_msg(msg)
         resp = self._expect_response(PlugwiseClockInfoResponse, seqnr)
         self.scheduleCRC = resp.scheduleCRC.value
-        debug("Circle %s get clock to %s" % (self.attr['name'], resp.time.value.isoformat()))
+        debug("Circle %s get clock to %s" % (self.name, resp.time.value.isoformat()))
         return resp.time.value
 
     def set_clock(self, dt):
         """set clock to the value indicated by the datetime object dt
         """
-        debug("Circle %s set clock to %s" % (self.attr['name'], dt.isoformat()))
-        msg = PlugwiseClockSetRequest(self.mac, dt).serialize()
+        debug("Circle %s set clock to %s" % (self.name, dt.isoformat()))
+        msg = PlugwiseClockSetRequest(self._mac(), dt).serialize()
         _, seqnr  = self._comchan.send_msg(msg)
         resp = self._expect_response(PlugwiseAckMacResponse, seqnr)
         #status = '00D7'
@@ -698,12 +714,12 @@ class Circle(object):
         """switch power on or off
         @param on: new state, boolean
         """
-        info("API  %s %s circle switch: %s" % (self.mac, self.attr["name"], 'on' if on else 'off',))
+        info("API  %s %s circle switch: %s" % (self.mac, self.name, 'on' if on else 'off',))
         if not isinstance(on, bool):
             return False
-        if self.attr['always_on'] != 'False' and on != True:
+        if self.always_on != 'False' and on != True:
             return False
-        req = PlugwiseSwitchRequest(self.mac, on)
+        req = PlugwiseSwitchRequest(self._mac(), on)
         _, seqnr  = self._comchan.send_msg(req.serialize())
         resp = self._expect_response(PlugwiseAckMacResponse, seqnr)
         if on == True:
@@ -751,7 +767,7 @@ class Circle(object):
             if log_buffer_index > 0:
                 log_buffer_index -= 1
 
-        log_req = PlugwisePowerBufferRequest(self.mac, log_buffer_index).serialize()
+        log_req = PlugwisePowerBufferRequest(self._mac(), log_buffer_index).serialize()
         _, seqnr  = self._comchan.send_msg(log_req)
         resp = self._expect_response(PlugwisePowerBufferResponse, seqnr)
         
@@ -806,7 +822,7 @@ class Circle(object):
             corrected_pulses = self.pulse_correction(pulses[i], intervals[i])
             watt = self.pulses_to_kWs(corrected_pulses)/intervals[i]*1000
             watthour = self.pulses_to_kWs(corrected_pulses)/3600*1000
-            if 'reverse_pol' in self.attr and self.attr['reverse_pol'] == 'True':
+            if self.reverse_pol == 'True':
                 watt = -watt 
                 watthour = -watthour
                 debug("get_power_usage_history: reverse polarity of %s" % (self.mac,))
@@ -829,7 +845,7 @@ class Circle(object):
             info_resp = self.get_info()
             log_buffer_index = info_resp['last_logaddr']
 
-        log_req = PlugwisePowerBufferRequest(self.mac, log_buffer_index).serialize()
+        log_req = PlugwisePowerBufferRequest(self._mac(), log_buffer_index).serialize()
         _, seqnr  = self._comchan.send_msg(log_req)
         resp = self._expect_response(PlugwisePowerBufferResponseRaw, seqnr)
         retl = getattr(resp, "raw").value
@@ -844,7 +860,7 @@ class Circle(object):
             False: Usage logging only.
             True:  Usage and Production logging.
         """
-        msg = PlugwiseLogIntervalRequest(self.mac, interval, interval if production else 0).serialize()
+        msg = PlugwiseLogIntervalRequest(self._mac(), interval, interval if production else 0).serialize()
         _, seqnr  = self._comchan.send_msg(msg)
         return self._expect_response(PlugwiseAckMacResponse, seqnr)
         #status = '00F8'
@@ -853,7 +869,7 @@ class Circle(object):
         """fetch feature set
         """
 
-        msg = PlugwiseFeatureSetRequest(self.mac).serialize()
+        msg = PlugwiseFeatureSetRequest(self._mac()).serialize()
         _, seqnr  = self._comchan.send_msg(msg)
         resp = self._expect_response(PlugwiseFeatureSetResponse, seqnr)
         return resp.features.value
@@ -861,7 +877,7 @@ class Circle(object):
     def get_circleplus_datetime(self):
         """fetch current time from the circle+
         """
-        msg = PlugwiseDateTimeInfoRequest(self.mac).serialize()
+        msg = PlugwiseDateTimeInfoRequest(self._mac()).serialize()
         _, seqnr  = self._comchan.send_msg(msg)
         resp = self._expect_response(PlugwiseDateTimeInfoResponse, seqnr)
         dt = datetime.datetime.combine(resp.date.value, resp.time.value)
@@ -870,7 +886,7 @@ class Circle(object):
     def set_circleplus_datetime(self, dt):
         """set circle+ clock to the value indicated by the datetime object dt
         """
-        msg = PlugwiseSetDateTimeRequest(self.mac, dt).serialize()
+        msg = PlugwiseSetDateTimeRequest(self._mac(), dt).serialize()
         _, seqnr  = self._comchan.send_msg(msg)
         return self._expect_response(PlugwiseAckMacResponse, seqnr)
         #status = '00DF'=ack '00E7'=nack
@@ -895,7 +911,7 @@ class Circle(object):
                 req = PlugwisePrepareScheduleRequest(idx, chunk)
                 _, seqnr  = self._comchan.send_msg(req.serialize())
             for idx in range(1,43):
-                req = PlugwiseSendScheduleRequest(self.mac, idx)
+                req = PlugwiseSendScheduleRequest(self._mac(), idx)
                 _, seqnr  = self._comchan.send_msg(req.serialize())
                 resp = self._expect_response(PlugwiseSendScheduleResponse, seqnr)
             info("circle.load_schedule. exit function")
@@ -904,12 +920,12 @@ class Circle(object):
         """switch schedule on or off
         @param on: new state, boolean
         """
-        info("API  %s %s circle schedule %s" % (self.mac, self.attr["name"], 'on' if on else 'off'))
+        info("API  %s %s circle schedule %s" % (self.mac, self.name, 'on' if on else 'off'))
         if not isinstance(on, bool):
             return False
-        if self.attr['always_on'] != 'False':
+        if self.always_on != 'False':
             return False
-        req = PlugwiseEnableScheduleRequest(self.mac, on)
+        req = PlugwiseEnableScheduleRequest(self._mac(), on)
         _, seqnr  = self._comchan.send_msg(req.serialize())
         resp = self._expect_response(PlugwiseAckMacResponse, seqnr)
         if on == True:
@@ -938,7 +954,7 @@ class Circle(object):
         """
         #TODO: incorporate this in Schedule object
         val = self.watt_to_pulses(val) if val>=0 else val
-        req = PlugwiseSetScheduleValueRequest(self.mac, val)
+        req = PlugwiseSetScheduleValueRequest(self._mac(), val)
         _, seqnr  = self._comchan.send_msg(req.serialize())
         return self._expect_response(PlugwiseAckMacResponse, seqnr)
         #status = '00FA'
@@ -967,7 +983,7 @@ class Circle(object):
     def ping(self):
         """ping circle
         """
-        req = PlugwisePingRequest(self.mac)
+        req = PlugwisePingRequest(self._mac())
         _, seqnr  = self._comchan.send_msg(req.serialize())
         debug("pinged mac %s, seqnr %s" % (self.mac, seqnr))
         return #self._expect_response(PlugwisePingResponse, seqnr)
@@ -975,7 +991,7 @@ class Circle(object):
     def ping_synchronous(self):
         """ping circle
         """
-        req = PlugwisePingRequest(self.mac)
+        req = PlugwisePingRequest(self._mac())
         _, seqnr  = self._comchan.send_msg(req.serialize())
         return self._expect_response(PlugwisePingResponse, seqnr)
 
@@ -983,7 +999,7 @@ class Circle(object):
         #Needs to be called on Circle+
         nodetable = []
         for idx in range(0,64):
-            req = PlugwiseAssociatedNodesRequest(self.mac, idx)
+            req = PlugwiseAssociatedNodesRequest(self._mac(), idx)
             _, seqnr  = self._comchan.send_msg(req.serialize())
             resp = self._expect_response(PlugwiseAssociatedNodesResponse, seqnr)
             nodetable.append(resp.node_mac_id.value)
@@ -991,13 +1007,13 @@ class Circle(object):
         
     def remove_node(self, removemac):
         #Needs to be called on Circle+
-        req = PlugwiseRemoveNodeRequest(self.mac, removemac)
+        req = PlugwiseRemoveNodeRequest(self._mac(), removemac)
         _, seqnr  = self._comchan.send_msg(req.serialize())
         resp = self._expect_response(PlugwiseRemoveNodeResponse, seqnr)
         return resp.status.value
             
     def reset(self):
-        req = PlugwiseResetRequest(self.mac, self._type(), 20)
+        req = PlugwiseResetRequest(self._mac(), self._type(), 20)
         _, seqnr  = self._comchan.send_msg(req.serialize())
         resp = self._expect_response(PlugwiseAckMacResponse, seqnr)
         return resp.status.value

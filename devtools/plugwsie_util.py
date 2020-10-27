@@ -1,8 +1,27 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
-# Copyright (C) 2015 SevenWatt - sevenwatt.com
-# Use of this source code is governed by the MIT license found in the LICENSE file.
-
+# Copyright (C) 2012,2013,2014,2015,2016,2017,2018,2019,2020 Seven Watt <info@sevenwatt.com>
+# <http://www.sevenwatt.com>
+#
+# This file is part of Plugwise-2-py.
+#
+# Plugwise-2-py is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Plugwise-2-py is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Plugwise-2-py.  If not, see <http://www.gnu.org/licenses/>. 
+#
+# The program is a major modification and extension to:
+#   python-plugwise - written in 2011 by Sven Petai <hadara@bsd.ee> 
+# which itself is inspired by Plugwise-on-Linux (POL):
+#   POL v0.2 - written in 2009 by Maarten Damen <http://www.maartendamen.com>
 
 from pprint import pprint
 import optparse
@@ -21,7 +40,7 @@ log_level(logging.INFO)
 DEFAULT_SERIAL_PORT = "/dev/ttyUSB0"
 
 #default settings for attr-field of cirle
-conf = {"mac": "000D6F0001000000", "category": "misc", "name": "circle_n", "loginterval": "60", "always_on": "False", "production": "False", "location": "misc"}
+conf = {"mac": "000D6F0001000000", "category": "misc", "name": "circle_n", "loginterval": "60", "always_on": "False", "production": "False", "reverse_pol": "False", "location": "misc"}
 
 parser = optparse.OptionParser()
 parser.add_option("-m", "--mac", dest="mac", help="MAC address")
@@ -120,8 +139,8 @@ def set_time(c, time_opt):
 try:
     device = Stick(device)
 	
-    conf['mac'] = options.mac
-    c = Circle(options.mac, device, conf)
+    conf['mac'] = options.mac.upper()
+    c = Circle(conf['mac'], device, conf)
 
     
     if options.time:

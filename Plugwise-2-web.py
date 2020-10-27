@@ -1,6 +1,6 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
-# Copyright (C) 2014, 2015 Seven Watt <info@sevenwatt.com>
+# Copyright (C) 2012,2013,2014,2015,2016,2017,2018,2019,2020 Seven Watt <info@sevenwatt.com>
 # <http://www.sevenwatt.com>
 #
 # This file is part of Plugwise-2.
@@ -25,16 +25,16 @@ import logging
 import logging.handlers
 import string
 import cgi
-import urlparse
+import urllib.parse
 import mimetypes
 import os
 import glob
 import json
 
 import threading
-from SocketServer import ThreadingMixIn
-from BaseHTTPServer import HTTPServer
-from SimpleHTTPServer import SimpleHTTPRequestHandler
+from socketserver import ThreadingMixIn
+from http.server import HTTPServer
+from http.server import SimpleHTTPRequestHandler
 import ssl
 from base64 import b64encode
 
@@ -54,7 +54,7 @@ cfg = json.load(open("pw-hostconfig.json"))
 pw_logger = None
 logpath = cfg['log_path']+'/'
 init_logger(logpath+"pw-web.log", "pw-web")
-if cfg.has_key('log_level'):
+if 'log_level' in cfg:
     if cfg['log_level'].strip().lower() == 'debug':
         log_level(logging.DEBUG)
     elif cfg['log_level'].strip().lower() == 'info':
@@ -63,12 +63,12 @@ if cfg.has_key('log_level'):
         log_level(logging.ERROR)
     else:
         log_level(logging.INFO)
-        
+
 info('Number of arguments: %d' % (len(sys.argv),))
 info('Argument List: %s' % (sys.argv,))
 
 #setup mqtt (if mosquitto bindings are found)
-import Queue
+import queue
 import threading
 #from pwmqttweb import *
 
@@ -78,8 +78,8 @@ try:
 except:
     mqtt = False
         
-qpub = Queue.Queue()
-qsub = Queue.Queue()
+qpub = queue.Queue()
+qsub = queue.Queue()
 broadcast = []
 last_topics = {}
 
@@ -87,9 +87,9 @@ last_topics = {}
 mqtt_t = None
 if  not mqtt:
     error("No MQTT python binding installed (mosquitto-python)")
-elif cfg.has_key('mqtt_ip') and cfg.has_key('mqtt_port'):
+elif 'mqtt_ip' in cfg and 'mqtt_port' in cfg:
     #connect to server and start worker thread.
-    if cfg.has_key('mqtt_user') and cfg.has_key('mqtt_password'):
+    if 'mqtt_user' in cfg and 'mqtt_password' in cfg:
         mqttclient = Mqtt_client(cfg['mqtt_ip'], cfg['mqtt_port'], qpub, qsub,"Plugwise-2-web",cfg['mqtt_user'],cfg['mqtt_password'])
     else:
         mqttclient = Mqtt_client(cfg['mqtt_ip'], cfg['mqtt_port'], qpub, qsub, "Plugwise-2-web")
@@ -112,9 +112,9 @@ if len(sys.argv) > 2:
 else:
     secure = False
 if len(sys.argv) > 3:
-    credentials = str(sys.argv[3])
+    credentials = str(sys.argv[3]).encode()
 else:
-    credentials = ""
+    credentials = b""
     
 def broadcaster():
     while True:
@@ -163,7 +163,7 @@ class PW2PYwebHandler(HTTPWebSocketsHandler):
         if self.path == '/index.html':
             self.path = '/pw2py.html'
         #parse url
-        purl = urlparse.urlparse(self.path)
+        purl = urllib.parse.urlparse(self.path)
         path = purl.path
         debug("PW2PYwebHandler.do_GET() parsed: " + path)
         if path == '/schedules':
@@ -205,7 +205,7 @@ class PW2PYwebHandler(HTTPWebSocketsHandler):
                 raw = self.rfile.read(length)
                 #print raw
                 if (ctype == 'application/x-www-form-urlencoded'):
-                    postvars = urlparse.parse_qs(raw, keep_blank_values=1)
+                    postvars = urllib.parse.parse_qs(raw, keep_blank_values=1)
 
                     if 'data' not in postvars:
 
@@ -290,7 +290,7 @@ class PW2PYwebHandler(HTTPWebSocketsHandler):
             self.log_error("Error parsing incoming websocket message: %s", err)
 
     def on_ws_connected(self):
-        self.q = Queue.Queue()
+        self.q = queue.Queue()
 
 
 
@@ -315,7 +315,7 @@ class PW2PYwebHandler(HTTPWebSocketsHandler):
         #allow some time for websockets to become fully operational
         time.sleep(2.0)
         #send last known state to webpage
-        topics = last_topics.items()
+        topics = list(last_topics.items())
         for topic in topics:
             self.q.put(topic)
         while self.connected:
@@ -333,7 +333,7 @@ class PW2PYwebHandler(HTTPWebSocketsHandler):
         
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     """Handle requests in a separate thread."""
- 
+
 def main():
     try:
         server = ThreadedHTTPServer(('', port), PW2PYwebHandler)
@@ -359,7 +359,7 @@ def main():
     except KeyboardInterrupt:
         print('^C received, shutting down server')
         server.shutdown()
-        print "exit after server.shutdown()"
+        print("exit after server.shutdown()")
 
 if __name__ == '__main__':
     main()
