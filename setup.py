@@ -17,6 +17,6 @@ setup(name='plugwise2py',
     packages=find_packages(),
     py_modules=['plugwise'],
     install_requires=install_reqs,
-    scripts=['Plugwise-2.py', 'Plugwise-2-web.py', 'plugwise_util'],
+    scripts=['Plugwise-2.py', 'Plugwise-2-web.py', 'swutil/util.py'],
 )
 
