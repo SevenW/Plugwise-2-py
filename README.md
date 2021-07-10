@@ -27,16 +27,16 @@ It also serves as a controller of the switches, and it can be used to upload
 switching/standby schedules to the circles.
 
 The interface to control is a file interface. There are three configuration files:
-- pw-hostconfig.json: some host/server specific settings.
-- pw-conf.json: intended as static configuration of the plugs.
-- pw-control.json: dynamic configuration.
+- `pw-hostconfig.json`: some host/server specific settings.
+- `pw-conf.json`: intended as static configuration of the plugs.
+- `pw-control.json`: dynamic configuration.
 
 Switching / stand-by killer schedules are defines as json files in the schedules folder
-- schedules/*.json: contains a week-schedule to switch the plugs on and off.
+- `schedules/*.json`: contains a week-schedule to switch the plugs on and off.
 
-Changes to pw-control.json and schedules/*.json are automatically picked up by Plugwise-2.py and applied.
+Changes to `pw-control.json` and `schedules/*.json` are automatically picked up by Plugwise-2.py and applied.
 
-pw-control.json and schedules/*.json can be edited with the web application (see below)
+`pw-control.json` and `schedules/*.json` can be edited with the web application (see below)
 
 In the dynamic configuration:
 - logging of the in-circle integrated values can be enabled (usually the one-value-per-hour loggings.
@@ -57,7 +57,8 @@ git clone https://github.com/SevenW/Plugwise-2-py.git
 cd Plugwise-2-py
 sudo pip install .
 ```
-> Note: include the period "." in the line above!
+
+**Note: include the period "." in the line above!**
 
 ## Configuration
 
@@ -74,15 +75,15 @@ cp -n config-default/pw-conf.json config/
 
 ### Configuring server and circles
 
-In config/pw-hostconfig.json edit tmp_path, permanent_path, log_path and serial
+In `config/pw-hostconfig.json` edit `tmp_path`, `permanent_path`, `log_path` and `serial`:
 
 ```{"permanent_path": "/home/pi/datalog", "tmp_path": "/tmp", "log_path": "/home/pi/pwlog", "serial": "/dev/ttyUSB0"}```
 
-> Note: For INFO/DEBUG logging, normally /var/log can be used as path. However, on the raspberry pi, only the root user can write in /var/log. Therefore it is better to log to /home/<username>/pwlog
+**Note: For INFO/DEBUG logging, normally `/var/log` can be used as path. However, on the raspberry pi, only the root user can write in `/var/log`. Therefore it is better to log to `/home/<username>/pwlog`**
 
-> Note: Editing JSON files is error-prone. Use a JSON Validator such as http://jsonlint.com/ to check the config files.
+**Note: Editing JSON files is error-prone. Use a JSON Validator such as http://jsonlint.com/ to check the config files.**
 
-Edit the proper Circle mac addresses in pw-conf.json and pw-control.json. Make more changes as appropriate to your needs.
+Edit the proper Circle mac addresses in `pw-conf.json` and `pw-control.json`. Make more changes as appropriate to your needs.
 - Enable 10-seconds monitoring: `"monitor": "yes"`
 - Enable logging form Circle internal metering buffers: `"savelog": "yes"`
 
@@ -91,11 +92,11 @@ Monitor this activity by tailing the log file:
 
 `tail -f /home/pi/pwlog/pw-logger.log`
 
-MQTT can be enable by adding two key,values to pw-hostconfig.json
+MQTT can be enable by adding two key, values to `pw-hostconfig.json`
 
 `"mqtt_ip": "127.0.0.1", "mqtt_port": "1883"`
 
-An example config file can be found in pw-hostconfig-mqtt.json
+An example config file can be found in `pw-hostconfig-mqtt.json`
 
 Plugwise-2-py provides a MQTT-client. A separate MQTT-server like Mosquitto needs to be installed to enable MQTT in Plugwise-2-py. On Ubuntu systems it can be done like this:
 
@@ -111,13 +112,13 @@ The default port is 1883.
 Plugwise-2-py and the web-server can be automatically started with upstart in Ubuntu, or a cron job on the Raspberry pi. See instructions in the `autostart-howto` folder.
 
 ### Debug
-the log level can be programmed in pw-control.json. Changes are picked up latest after 10 seconds.
+the log level can be programmed in `pw-control.json`. Changes are picked up latest after 10 seconds.
 
 `"log_level": "info"` can have values error, info, debug
 
 `"log_comm": "no"` can have values no and yes.
 
-log_comm results in logging to  pw-communications.log, in the log folder specified through log_path in pw-hostconfig.json
+`log_comm` results in logging to `pw-communications.log`, in the log folder specified through `log_path` in `pw-hostconfig.json`.
 
 ### Update from github
 
@@ -130,23 +131,25 @@ sudo pip install --upgrade .
 ## Web interface
 
 Plugwise-2-py can be operated through a web interfaces. The packages comes with its own dedicated web-server also written in python. It makes use of websockets for efficient and unsolicited communication.
-##setup
+
+## Setup
 
 ```shell
 #assume current directory is Plugwise-2-py main directory
 nohup python Plugwise-2-web.py 8000 secure plugwise:mysecret >>pwwebout.log&
 ```
 
-This uses SSL/https. Change plugwise:mysecret in a username:password chosen by yourself. The websserver uses port 8000 by default, and can be changed by an optional parameter:
+This uses SSL/https. Change `plugwise:mysecret` in a `username:password` chosen by yourself. The websserver uses port 8000 by default, and can be changed by an optional parameter:
 
 `nohup python Plugwise-2-web.py 8001 secure plugwise:mysecret >>pwwebout.log&`
 
-Providing a user:password is optional, as well as using SSL/https. When the website is only accessible within your LAN, then the server can be used as plain http, by omitting the secure parameter. The following parameter formats are valid:
+Providing a `user:password` is optional, as well as using SSL/https. When the website is only accessible within your LAN, then the server can be used as plain http, by omitting the secure parameter. The following parameter formats are valid:
 
 ```shell
+# https, with username and password
 nohup python Plugwise-2-web.py 8001 secure user:password >>pwwebout.log&
 
-# no username and password requested
+# https, no username and password requested
 nohup python Plugwise-2-web.py 8000 secure >>pwwebout.log&
 
 # plain http, with optional port
@@ -196,7 +199,7 @@ power readings can be published
 - on request
 
 #### Autonomous
-Autonomous messages are published when monitoring = "yes" and when savelog = "yes". The 10-seconds monitoring published messages:
+Autonomous messages are published when `monitoring = "yes"` and when `savelog = "yes"`. The 10-seconds monitoring published messages:
 
 `plugwise2py/state/power/000D6F0001Annnnn {"typ":"pwpower","ts":1405452425,"mac":"000D6F0001Annnnn","power":9.78}`
 
@@ -233,7 +236,7 @@ The circle does respond with a state message, from which it can be deduced wheth
 
 Openhab can communicate with Plugwise-2-py through a MQTT server. Openhab provides a convenient system to operate switches and schedules. Also it can be used to record power readings and draw some graphs.
 
-TODO: Add a description.
+**TODO: Add a description.**
 Example sitemap, items, rules and transforms can be found in the openhab folder in this repository
 
 ### Domoticz
