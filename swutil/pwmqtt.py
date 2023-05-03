@@ -45,7 +45,6 @@ class Mqtt_client(object):
         self.user = user
         self.password = password
         self.subscriptions = {}
-        
         self.connect()
         debug("MQTT init done")
         
@@ -53,7 +52,7 @@ class Mqtt_client(object):
         return (self.rc == 0)
         
     def connect(self):
-        self.mqttc = mosquitto.Mosquitto(self.name)
+        self.mqttc = mosquitto.Client(self.name)
         self.mqttc.on_message = self.on_message
         self.mqttc.on_connect = self.on_connect
         self.mqttc.on_disconnect = self.on_disconnect
